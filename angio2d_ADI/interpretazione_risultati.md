@@ -95,7 +95,7 @@ Con `k2 = 0.3` la degradazione è lenta. Il campo `F` resta prossimo a 1 su gran
 
 ## Figura 2 — Diagnostica temporale
 
-![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure2.png)
+![Figure 2](img/figure2.png)
 
 | Quantità | Andamento | Interpretazione |
 |----------|-----------|-----------------|
@@ -107,7 +107,7 @@ Con `k2 = 0.3` la degradazione è lenta. Il campo `F` resta prossimo a 1 su gran
 
 ## Figura 3 — Sezioni 1D lungo `y = Ly/2`
 
-![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure3.png)
+![Figure 3](img/figure3.png)
 
 **`C` vs `F`** — il fronte netto di `C` corrisponde a un calo localizzato di `F`: invasione cellulare accompagnata da degradazione della matrice.
 
@@ -117,7 +117,7 @@ Con `k2 = 0.3` la degradazione è lenta. Il campo `F` resta prossimo a 1 su gran
 
 ## Figura 4 — Campo TAF e gradiente
 
-![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure4.png)
+![Figure 4](img/figure4.png)
 
 Il TAF è assegnato come:
 
