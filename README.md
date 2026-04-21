@@ -1,1 +1,77 @@
 # angio_2d
+
+Implementazione MATLAB di un modello bidimensionale di angiogenesi tumorale basato su splitting operatoriale e schema ADI.
+
+## Problema modellato
+
+Il progetto descrive l'evoluzione nel piano di quattro campi accoppiati:
+
+- `C(x,y,t)`: densita di cellule endoteliali
+- `P(x,y,t)`: concentrazione di proteasi
+- `Inh(x,y,t)`: concentrazione di inibitore angiogenico
+- `F(x,y,t)`: densita di matrice extracellulare (ECM)
+
+Il sistema segue l'idea del paper allegato nel PDF: la crescita dei vasi tumorali viene modellata come interazione tra diffusione, chemotassi, haptotassi, proliferazione cellulare e degradazione della matrice extracellulare. La sorgente angiogenica tumorale, indicata come TAF, viene prescritta come un campo stazionario con massimo vicino al bordo destro del dominio, così da guidare il moto delle cellule verso la zona tumorale.
+
+Dal punto di vista numerico il problema viene risolto su un dominio rettangolare con condizioni di Neumann omogenee. La dinamica in tempo è separata in due parti: un passo di reazione/trasporto trattato esplicitamente e un passo diffusivo trattato con ADI di Peaceman-Rachford, in modo da trasformare il problema 2D in una sequenza di sistemi tridiagonali 1D.
+
+## File MATLAB
+
+### `angio2d_ADI/default_params.m`
+
+Definisce tutti i parametri del modello e della discretizzazione. In particolare:
+
+- imposta dominio, griglia e tempo finale
+- assegna i coefficienti di diffusione e le costanti cinetiche
+- definisce i parametri della chemotassi, haptotassi e del TAF
+- imposta le condizioni iniziali
+- calcola automaticamente il passo temporale `tau` a partire da una stima CFL e determina il numero di passi `Nsteps`
+
+Questo file non esegue la simulazione: prepara solo la struttura `p` che contiene i parametri necessari a tutto il resto.
+
+### `angio2d_ADI/angio2d_core.m`
+
+Esegue il calcolo numerico vero e proprio. Il file:
+
+- costruisce la griglia 2D uniforme
+- costruisce gli operatori discreti 1D di derivata e Laplaciano
+- estende questi operatori al caso 2D tramite prodotti di Kronecker
+- inizializza i campi `C`, `P`, `Inh` e `F`
+- evolve il sistema nel tempo con splitting di Strang
+- usa un passo esplicito per il termine di reazione e advezione
+- usa ADI per il sottopasso diffusivo di `C`, `P` e `Inh`
+- aggiorna le diagnostiche temporali: massa di `C`, massa di `F` ed energia discreta
+- restituisce i campi finali e una struttura `diagnostics` con griglia, parametri e serie temporali
+
+In pratica questo è il cuore del solver: dato un insieme di parametri, produce la soluzione al tempo finale.
+
+### `angio2d_ADI/plot_angio2d.m`
+
+Si occupa della visualizzazione dei risultati. A partire dai campi calcolati da `angio2d_core` e dalla struttura `diagnostics`, genera quattro figure:
+
+- mappe 2D finali di `C`, `P`, `Inh` e `F`
+- diagnostica temporale di masse ed energia
+- sezioni 1D lungo la mezzeria del dominio
+- campo TAF con gradiente sovrapposto tramite `quiver`
+
+Il file supporta anche il salvataggio automatico delle figure in una cartella dedicata, in formati come PNG, PDF o EPS.
+
+## Uso tipico
+
+Esempio minimo di esecuzione:
+
+```matlab
+p = default_params();
+[C, P, Inh, F, diagnostics] = angio2d_core(p);
+plot_angio2d(C, P, Inh, F, diagnostics);
+```
+
+## Struttura del flusso
+
+1. `default_params.m` prepara i parametri.
+2. `angio2d_core.m` risolve il modello e restituisce la soluzione finale.
+3. `plot_angio2d.m` visualizza e, se richiesto, salva i risultati.
+
+## Riferimento concettuale
+
+La formulazione del problema e la scelta dello schema numerico sono coerenti con il PDF allegato, che introduce un'estensione bidimensionale del modello classico di angiogenesi tumorale e motiva l'uso di operator splitting e ADI per ridurre il costo computazionale della parte diffusiva.
