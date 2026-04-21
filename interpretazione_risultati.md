@@ -49,7 +49,7 @@ Con i parametri di default il sistema si trova in un regime a:
 
 ## Figura 1 — Campi 2D
 
-
+![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure1.png)
 
 ### Cellule endoteliali `C`
 
@@ -95,6 +95,8 @@ Con `k2 = 0.3` la degradazione è lenta. Il campo `F` resta prossimo a 1 su gran
 
 ## Figura 2 — Diagnostica temporale
 
+![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure2.png)
+
 | Quantità | Andamento | Interpretazione |
 |----------|-----------|-----------------|
 | Massa `C` | crescente | proliferazione logistica biologicamente realistica |
@@ -105,6 +107,8 @@ Con `k2 = 0.3` la degradazione è lenta. Il campo `F` resta prossimo a 1 su gran
 
 ## Figura 3 — Sezioni 1D lungo `y = Ly/2`
 
+![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure3.png)
+
 **`C` vs `F`** — il fronte netto di `C` corrisponde a un calo localizzato di `F`: invasione cellulare accompagnata da degradazione della matrice.
 
 **`P` vs `I`** — `P` cresce dove `C` è alta; `I` cala localmente nelle stesse zone. Conferma l'interazione non lineare accoppiata tra i quattro campi.
@@ -112,6 +116,8 @@ Con `k2 = 0.3` la degradazione è lenta. Il campo `F` resta prossimo a 1 su gran
 ---
 
 ## Figura 4 — Campo TAF e gradiente
+
+![Figure 1](/home/vincenzo/Documents/angio_2d/angio2d_ADI/img/figure4.png)
 
 Il TAF è assegnato come:
 
