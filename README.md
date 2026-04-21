@@ -66,6 +66,47 @@ p = default_params();
 plot_angio2d(C, P, Inh, F, diagnostics);
 ```
 
+## Esecuzione da terminale VS Code
+
+Per lavorare direttamente dal terminale integrato di VS Code, senza aprire l'applicazione grafica di MATLAB, usa una delle due modalità seguenti.
+
+### Modalita interattiva
+
+Avvia MATLAB in modalita testuale:
+
+```bash
+matlab -nodesktop -nosplash
+```
+
+Poi esegui questi comandi dentro MATLAB:
+
+```matlab
+cd('/home/vincenzo/Documents/angio_2d/angio2d_ADI')
+p = default_params();
+[C, P, Inh, F, diagnostics] = angio2d_core(p);
+plot_angio2d(C, P, Inh, F, diagnostics);
+```
+
+### Modalita batch
+
+Se vuoi eseguire tutto in un solo comando e terminare automaticamente alla fine del calcolo:
+
+```bash
+matlab -batch "cd('/home/vincenzo/Documents/angio_2d/angio2d_ADI'); p = default_params(); [C,P,Inh,F,diagnostics] = angio2d_core(p); plot_angio2d(C,P,Inh,F,diagnostics);"
+```
+
+Questa seconda opzione e comoda per test ripetibili, automazione e collaborazione tra piu persone.
+
+## Esecuzione con GUI MATLAB
+
+Se vuoi lavorare con l'interfaccia grafica di MATLAB, apri un terminale e lancia semplicemente:
+
+```bash
+matlab
+```
+
+Questo comando avvia direttamente l'applicazione MATLAB con la GUI. Una volta aperto l'ambiente, imposta la cartella del progetto su `/home/vincenzo/Documents/angio_2d/angio2d_ADI` e poi esegui i comandi di simulazione descritti sopra.
+
 ## Struttura del flusso
 
 1. `default_params.m` prepara i parametri.
