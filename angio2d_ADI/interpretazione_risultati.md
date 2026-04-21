@@ -49,7 +49,7 @@ Con i parametri di default il sistema si trova in un regime a:
 
 ## Figura 1 — Campi 2D
 
-![Figure 1](angio2d_ADI/img/figure1.png)
+![Figure 1](img/figure1.png)
 
 ### Cellule endoteliali `C`
 
