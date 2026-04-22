@@ -11,7 +11,7 @@ L'obiettivo e` avere un flusso semplice e riproducibile per chiunque cloni il re
 ## Requisiti
 
 Servono:
-- un compilatore C disponibile come `cc`
+- un compilatore C disponibile come `cc`, `clang` o `gcc`
 - `make`
 - Python 3
 
@@ -61,6 +61,13 @@ Compilare:
 make clean && make
 ```
 
+Nota:
+- non serve impostare `cc99` manualmente
+- il progetto passa gia` `-std=c99` tramite il build system
+- il compilatore di default e` `cc`
+- se serve un compilatore diverso, puoi usare per esempio `make CC=gcc` oppure `make CC=clang`
+- se vuoi controllare l'ambiente prima del run puoi usare `make check-env` oppure `make check-python`
+
 Eseguire solo il solver:
 
 ```bash
@@ -71,6 +78,8 @@ Target `make` disponibili:
 
 ```bash
 make
+make check-env
+make check-python
 make run
 make figures
 make compare

@@ -1,4 +1,4 @@
-CC ?= gcc
+CC ?= cc
 CSTD ?= -std=c99
 WARN_FLAGS ?= -Wall -Wextra -Wpedantic
 OPT_FLAGS ?= -O2

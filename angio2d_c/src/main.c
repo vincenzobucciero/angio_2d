@@ -11,6 +11,10 @@
 #include <math.h>
 #include <sys/stat.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static void ensure_output_dirs(void) {
     /* Keep every generated artifact under output/ so runs stay self-contained. */
     mkdir("output", 0777);
