@@ -26,7 +26,8 @@ typedef struct {
  * Input: Params p (contiene Lx, Ly, Mx, My, hx, hy)
  * Output: Grid* con X[], Y[] arrays
  * 
- * Indexing: (i,j) -> idx = i + Mx*j  (riga-major, compatibile MATLAB column-major)
+ * Linear indexing: (i,j) -> idx = i + Mx*j.
+ * This matches MATLAB's column-wise flattening for arrays shaped Mx x My.
  */
 Grid* grid_create(const Params *p);
 

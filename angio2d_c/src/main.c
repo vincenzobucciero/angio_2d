@@ -9,8 +9,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <sys/stat.h>
+
+static void ensure_output_dirs(void) {
+    /* Keep every generated artifact under output/ so runs stay self-contained. */
+    mkdir("output", 0777);
+    mkdir("output/csv", 0777);
+    mkdir("output/figures", 0777);
+}
 
 int main(void) {
+    ensure_output_dirs();
+
     Params *p = params_init();
     if (!p) return 1;
     
@@ -80,8 +90,10 @@ int main(void) {
     for (int j = 0; j < p->My; j++) {
         for (int i = 0; i < p->Mx; i++) {
             int idx = i + p->Mx * j;
-            double xi = g->X[i];    // X coordina (i-esima in griglia)
-            double eta = g->Y[j];   // Y coordina (j-esima in griglia)
+            // Use the flattened grid index so the C initialization matches
+            // MATLAB's X(i,j), Y(i,j) values point-by-point.
+            double xi = g->X[idx];
+            double eta = g->Y[idx];
             
             // C: tanh transizione
             C[idx] = p->C0 * 0.5 * (1.0 - tanh((xi - p->a) / p->sigma_IC));
@@ -125,8 +137,9 @@ int main(void) {
     
     // Stampa summary e salva diagnostics
     diagnostics_print_summary(diag, p);
-    diagnostics_save_csv(diag, p, "diagnostics_c.csv");
-    save_solution_to_csv(C, P, Inh, F, p, "solution_c");
+    diagnostics_save_csv(diag, p, "output/csv/diagnostics_c.csv");
+    save_solution_to_csv(C, P, Inh, F, p, "output/csv/solution_c");
+    save_run_metadata(p, "output/csv/run_metadata.csv");
     
     // Cleanup
     free(C);

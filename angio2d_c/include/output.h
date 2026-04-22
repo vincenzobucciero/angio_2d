@@ -13,4 +13,6 @@ void save_solution_to_csv(const double *C, const double *P,
                           const double *Inh, const double *F,
                           const Params *p, const char *prefix);
 
+void save_run_metadata(const Params *p, const char *filename);
+
 #endif // OUTPUT_H

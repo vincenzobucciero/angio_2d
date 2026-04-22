@@ -84,23 +84,20 @@ Operators* operators_create(const Params *p) {
 
 void apply_laplacian_2d(double *out, const double *in,
                         const Operators *op, const Params *p) {
-    double *tmp = (double*) malloc(p->Mx * p->My * sizeof(double));
     memset(out, 0, p->Mx * p->My * sizeof(double));
     
-    // Parte x: out += (I⊗Lx) * in
-    // Per ogni colonna j, applica Lx ai Mx elementi
+    // MATLAB: for each fixed j, apply the row i of Lx to the x-column in(:,j).
     for (int j = 0; j < p->My; j++) {
         for (int i = 0; i < p->Mx; i++) {
             for (int ii = 0; ii < p->Mx; ii++) {
-                int idx_out = ii + p->Mx * j;
+                int idx_out = i + p->Mx * j;
                 int idx_in  = ii + p->Mx * j;
                 out[idx_out] += op->Lx[i*p->Mx + ii] * in[idx_in];
             }
         }
     }
     
-    // Parte y: out += (Ly⊗I) * in
-    // Per ogni riga i, applica Ly ai My elementi
+    // MATLAB: for each fixed i, apply the row j of Ly to the y-line in(i,:).
     for (int i = 0; i < p->Mx; i++) {
         for (int j = 0; j < p->My; j++) {
             for (int jj = 0; jj < p->My; jj++) {
@@ -110,8 +107,6 @@ void apply_laplacian_2d(double *out, const double *in,
             }
         }
     }
-    
-    free(tmp);
 }
 
 void apply_gradient_x_2d(double *out, const double *in,

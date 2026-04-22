@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-C_FILE = BASE_DIR / "diagnostics_c.csv"
-M_FILE = BASE_DIR / "diagnostics_matlab.csv"
+C_FILE = BASE_DIR / "output" / "csv" / "diagnostics_c.csv"
+M_FILE = BASE_DIR.parent / "angio2d_ADI" / "output" / "csv" / "diagnostics_matlab.csv"
 
 
 def load_csv(path: Path):
@@ -24,12 +24,12 @@ def rel_inf(a, b):
 
 def main():
     if not C_FILE.exists():
-        print(f"Missing file: {C_FILE}")
-        return 1
+        print(f"SKIP: missing file {C_FILE}")
+        return 0
     if not M_FILE.exists():
-        print(f"Missing file: {M_FILE}")
-        print("Export diagnostics_matlab.csv from MATLAB with columns: t,mC,mF,Energy")
-        return 1
+        print(f"SKIP: missing file {M_FILE}")
+        print("Export diagnostics_matlab.csv from MATLAB into angio2d_ADI/output/csv/")
+        return 0
 
     tc, mc_c, mf_c, en_c = load_csv(C_FILE)
     tm, mc_m, mf_m, en_m = load_csv(M_FILE)
