@@ -23,6 +23,7 @@ Environment:
 """
 
 from pathlib import Path
+import importlib.util
 import os
 import subprocess
 import shutil
@@ -79,6 +80,25 @@ def resolve_python() -> str:
     return sys.executable
 
 
+def ensure_python_dependencies() -> None:
+    """Fail early with a readable message when plotting dependencies are missing."""
+    missing = []
+    module_map = {
+        "numpy": "numpy",
+        "matplotlib": "matplotlib",
+        "PIL": "pillow",
+    }
+    for module_name, package_name in module_map.items():
+        if importlib.util.find_spec(module_name) is None:
+            missing.append(package_name)
+
+    if missing:
+        joined = ", ".join(missing)
+        print_error(f"Missing Python dependencies: {joined}")
+        print("Install them with: pip install -r requirements.txt")
+        raise SystemExit(1)
+
+
 def run(cmd, cwd, description: str = ""):
     """Execute a command with progress reporting."""
     if description:
@@ -127,6 +147,7 @@ def clean_output_dir():
 
 def main():
     python_cmd = resolve_python()
+    ensure_python_dependencies()
 
     print_header("ANGIO2D C Solver Pipeline")
     print(f"Working directory: {BASE_DIR}\n")
