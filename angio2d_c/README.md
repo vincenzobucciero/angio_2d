@@ -38,6 +38,11 @@ Poi entra nella cartella C:
 cd angio2d_c
 ```
 
+Per il compilatore provare asd eseguire questo comando.
+```bash
+export CPPFLAGS="-D_GNU_SOURCE -I include"
+```
+
 ## Flusso completo
 
 Il comando piu` semplice e`:
