@@ -53,6 +53,21 @@ void save_solution_to_csv(const double *C, const double *P,
     printf("Solution saved to %s_[CPIF].csv\n", prefix);
 }
 
+void save_run_metadata(const Params *p, const char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);
+        return;
+    }
+
+    fprintf(fp, "Mx,My,Lx,Ly,hx,hy,Tf,tau,Nsteps,epsilon\n");
+    fprintf(fp, "%d,%d,%.10e,%.10e,%.10e,%.10e,%.10e,%.10e,%d,%.10e\n",
+            p->Mx, p->My, p->Lx, p->Ly, p->hx, p->hy,
+            p->Tf, p->tau, p->Nsteps, p->epsilon);
+    fclose(fp);
+    printf("Run metadata saved to %s\n", filename);
+}
+
 void diagnostics_print_summary(const Diagnostics *diag, const Params *p) {
     if (diag->step == 0) {
         printf("ERROR: No diagnostics recorded\n");

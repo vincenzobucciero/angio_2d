@@ -15,6 +15,11 @@ Params* params_init(void) {
         return NULL;
     }
     
+    /*
+     * Single source of truth for the default run configuration.
+     * If future developers want a different baseline experiment, the
+     * physical and numerical parameters should be changed here.
+     */
     /* Domain & grid */
     p->Lx = 1.0;
     p->Ly = 1.0;

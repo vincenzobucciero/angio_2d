@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import numpy as np
+import matplotlib
+
+# Force a non-interactive backend so the script works reliably in terminal/CI.
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-OUTPUT_DIR_C = BASE_DIR / "output-c"
-OUTPUT_DIR_C.mkdir(exist_ok=True)
+OUTPUT_DIR = BASE_DIR / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR_FIG = OUTPUT_DIR / "figures"
+OUTPUT_DIR_FIG.mkdir(exist_ok=True)
 
 FIG_NAMES = {
     "fig1": "figure_1_campi_2d_t_f.jpeg",
@@ -17,14 +23,15 @@ FIG_NAMES = {
 
 def save_figure(fig, name_key: str):
     filename = FIG_NAMES[name_key]
-    fig.savefig(OUTPUT_DIR_C / filename, dpi=300)
+    fig.savefig(OUTPUT_DIR_FIG / filename, dpi=300)
 
-DIAG_FILE = BASE_DIR / "diagnostics_c.csv"
+DIAG_FILE = OUTPUT_DIR / "csv" / "diagnostics_c.csv"
+METADATA_FILE = OUTPUT_DIR / "csv" / "run_metadata.csv"
 SOL_FILES = {
-    "C": BASE_DIR / "solution_c_C.csv",
-    "P": BASE_DIR / "solution_c_P.csv",
-    "Inh": BASE_DIR / "solution_c_Inh.csv",
-    "F": BASE_DIR / "solution_c_F.csv",
+    "C": OUTPUT_DIR / "csv" / "solution_c_C.csv",
+    "P": OUTPUT_DIR / "csv" / "solution_c_P.csv",
+    "Inh": OUTPUT_DIR / "csv" / "solution_c_Inh.csv",
+    "F": OUTPUT_DIR / "csv" / "solution_c_F.csv",
 }
 
 
@@ -38,18 +45,38 @@ def load_solution(path: Path, mx: int, my: int):
     return values.reshape((mx, my), order="F")
 
 
+def load_metadata(path: Path):
+    data = np.genfromtxt(path, delimiter=",", names=True)
+    return {
+        "mx": int(data["Mx"]),
+        "my": int(data["My"]),
+        "lx": float(data["Lx"]),
+        "ly": float(data["Ly"]),
+        "hx": float(data["hx"]),
+        "hy": float(data["hy"]),
+        "tf": float(data["Tf"]),
+        "tau": float(data["tau"]),
+        "nsteps": int(data["Nsteps"]),
+        "epsilon": float(data["epsilon"]),
+    }
+
+
 def main():
     if not DIAG_FILE.exists():
         print(f"Missing diagnostics file: {DIAG_FILE}")
         return 1
+    if not METADATA_FILE.exists():
+        print(f"Missing run metadata file: {METADATA_FILE}")
+        return 1
 
     t, mC, mF, En = load_diagnostics(DIAG_FILE)
+    meta = load_metadata(METADATA_FILE)
 
-    mx = 64
-    my = 64
-    lx = 1.0
-    ly = 1.0
-    epsilon = 1.0
+    mx = meta["mx"]
+    my = meta["my"]
+    lx = meta["lx"]
+    ly = meta["ly"]
+    epsilon = meta["epsilon"]
 
     x = np.linspace(0.0, lx, mx)
     y = np.linspace(0.0, ly, my)
@@ -74,7 +101,7 @@ def main():
         ax.set_ylabel("y")
         ax.set_title(f"{label},  t = {t[-1]:.3f}")
         fig1.colorbar(im, ax=ax)
-    fig1.suptitle(f"Angio2D — M_x={mx}, M_y={my}")
+    fig1.suptitle(f"Angio2D — M_x={mx}, M_y={my}, tau={meta['tau']:.2e}")
     fig1.tight_layout()
     save_figure(fig1, "fig1")
     plt.close(fig1)
@@ -156,7 +183,7 @@ def main():
     save_figure(fig4, "fig4")
     plt.close(fig4)
 
-    print(f"Figures saved in: {OUTPUT_DIR_C}")
+    print(f"Figures saved in: {OUTPUT_DIR_FIG}")
     return 0
 
 
