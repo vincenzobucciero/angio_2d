@@ -1,85 +1,103 @@
-#include "params.h"
-#include "grid.h"
-#include "taf.h"
-#include "operators.h"
-#include "reaction.h"
-#include "adi.h"
-#include "diagnostics.h"
-#include "output.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <sys/stat.h>
+#include "params.h"		
+#include "grid.h"		
+#include "taf.h"		
+#include "operators.h"		
+#include "reaction.h"		
+#include "adi.h"		
+#include "diagnostics.h"		
+#include "output.h"		
+#include <stdlib.h>		
+#include <stdio.h>		
+#include <math.h>		
+#include <sys/stat.h>		
 
+/*
+ * Crea le directory di output necessarie per la simulazione.
+ *
+ * Tutti i file generati vengono salvati sotto output/
+ * per mantenere ogni esecuzione auto-contenuta.
+ */
 static void ensure_output_dirs(void) {
-    /* Keep every generated artifact under output/ so runs stay self-contained. */
-    mkdir("output", 0777);
-    mkdir("output/csv", 0777);
-    mkdir("output/figures", 0777);
+    mkdir("output", 0777);		// Crea directory principale output
+    mkdir("output/csv", 0777);		// Crea sottocartella per file CSV
+    mkdir("output/figures", 0777);		// Crea sottocartella per figure
 }
 
+/*
+ * Funzione principale del programma.
+ *
+ * Flusso generale:
+ * 1) crea directory di output
+ * 2) inizializza parametri, griglia, TAF, operatori, ADI, diagnostica
+ * 3) alloca e inizializza le variabili di stato
+ * 4) esegue il ciclo temporale con Strang splitting
+ * 5) salva risultati e libera memoria
+ */
 int main(void) {
-    ensure_output_dirs();
+    ensure_output_dirs();		// Assicura l'esistenza delle directory di output
 
-    Params *p = params_init();
-    if (!p) return 1;
+    Params *p = params_init();		// Inizializza i parametri del modello
+    if (!p) return 1;		// Esce se l'inizializzazione fallisce
     
-    Grid *g = grid_create(p);
-    if (!g) {
-        params_free(p);
-        return 1;
+    Grid *g = grid_create(p);		// Costruisce la griglia cartesiana uniforme
+    if (!g) {		// Controlla errore
+        params_free(p);		// Libera parametri
+        return 1;		// Esce
     }
     
-    TAF *taf = taf_compute(p, g);
-    if (!taf) {
-        grid_free(g);
-        params_free(p);
-        return 1;
+    TAF *taf = taf_compute(p, g);		// Calcola campo TAF e quantità ausiliarie
+    if (!taf) {		// Controlla errore
+        grid_free(g);		// Libera griglia
+        params_free(p);		// Libera parametri
+        return 1;		// Esce
     }
     
-    Operators *op = operators_create(p);
-    if (!op) {
-        taf_free(taf);
-        grid_free(g);
-        params_free(p);
-        return 1;
+    Operators *op = operators_create(p);		// Costruisce operatori discreti
+    if (!op) {		// Controlla errore
+        taf_free(taf);		// Libera TAF
+        grid_free(g);		// Libera griglia
+        params_free(p);		// Libera parametri
+        return 1;		// Esce
     }
     
-    ADI *adi = adi_create(p);
-    if (!adi) {
-        operators_free(op);
-        taf_free(taf);
-        grid_free(g);
-        params_free(p);
-        return 1;
+    ADI *adi = adi_create(p);		// Alloca struttura per il solver diffusivo ADI
+    if (!adi) {		// Controlla errore
+        operators_free(op);		// Libera operatori
+        taf_free(taf);		// Libera TAF
+        grid_free(g);		// Libera griglia
+        params_free(p);		// Libera parametri
+        return 1;		// Esce
     }
     
-    Diagnostics *diag = diagnostics_create(p->Nsteps);
-    if (!diag) {
-        adi_free(adi);
-        operators_free(op);
-        taf_free(taf);
-        grid_free(g);
-        params_free(p);
-        return 1;
+    Diagnostics *diag = diagnostics_create(p->Nsteps);		// Alloca diagnostica temporale
+    if (!diag) {		// Controlla errore
+        adi_free(adi);		// Libera ADI
+        operators_free(op);		// Libera operatori
+        taf_free(taf);		// Libera TAF
+        grid_free(g);		// Libera griglia
+        params_free(p);		// Libera parametri
+        return 1;		// Esce
     }
     
-    // Alloca variabili di stato
-    int M = p->Mx * p->My;
-    double *C = (double*) malloc(M * sizeof(double));
-    double *P = (double*) malloc(M * sizeof(double));
-    double *Inh = (double*) malloc(M * sizeof(double));
-    double *F = (double*) malloc(M * sizeof(double));
+    int M = p->Mx * p->My;		// Numero totale di nodi della griglia
+
+    double *C = (double*) malloc(M * sizeof(double));		// Densità cellule endoteliali
+    double *P = (double*) malloc(M * sizeof(double));		// Proteasi
+    double *Inh = (double*) malloc(M * sizeof(double));		// Inibitore
+    double *F = (double*) malloc(M * sizeof(double));		// Matrice extracellulare
     
-    if (!C || !P || !Inh || !F) {
-        free(C); free(P); free(Inh); free(F);
-        diagnostics_free(diag);
-        adi_free(adi);
-        operators_free(op);
-        taf_free(taf);
-        grid_free(g);
-        params_free(p);
-        return 1;
+    if (!C || !P || !Inh || !F) {		// Controlla allocazione delle variabili di stato
+        free(C);		// Libera C se allocato
+        free(P);		// Libera P se allocato
+        free(Inh);		// Libera Inh se allocato
+        free(F);		// Libera F se allocato
+        diagnostics_free(diag);		// Libera diagnostica
+        adi_free(adi);		// Libera ADI
+        operators_free(op);		// Libera operatori
+        taf_free(taf);		// Libera TAF
+        grid_free(g);		// Libera griglia
+        params_free(p);		// Libera parametri
+        return 1;		// Esce con errore
     }
     
     // Inizializza condizioni iniziali da griglia (grid coordinate X[], Y[])
@@ -87,70 +105,58 @@ int main(void) {
     // MATLAB: P = 0.1 + 0.01 * cos(2*pi*X) * cos(2*pi*Y)
     // MATLAB: Inh = 0.1 + 0.005 * cos(4*pi*X) * cos(4*pi*Y)
     // MATLAB: F = 1.0 + 0.01 * cos(pi*X) * cos(pi*Y)
-    for (int j = 0; j < p->My; j++) {
-        for (int i = 0; i < p->Mx; i++) {
-            int idx = i + p->Mx * j;
-            // Use the flattened grid index so the C initialization matches
-            // MATLAB's X(i,j), Y(i,j) values point-by-point.
-            double xi = g->X[idx];
-            double eta = g->Y[idx];
+    for (int j = 0; j < p->My; j++) {		// Loop su y
+        for (int i = 0; i < p->Mx; i++) {		// Loop su x
+            int idx = i + p->Mx * j;		// Indice lineare del nodo (i,j)
+
+            double xi = g->X[idx];		// Coordinata x del nodo corrente
+            double eta = g->Y[idx];		// Coordinata y del nodo corrente
             
-            // C: tanh transizione
-            C[idx] = p->C0 * 0.5 * (1.0 - tanh((xi - p->a) / p->sigma_IC));
+            C[idx] = p->C0 * 0.5 * (1.0 - tanh((xi - p->a) / p->sigma_IC));		// Profilo iniziale sigmoide di C
             
-            // P: cos(2*pi*X) * cos(2*pi*Y)
-            P[idx] = 0.1 + 0.01 * cos(2.0*M_PI*xi) * cos(2.0*M_PI*eta);
+            P[idx] = 0.1 + 0.01 * cos(2.0*M_PI*xi) * cos(2.0*M_PI*eta);		// Perturbazione iniziale di P
             
-            // Inh: cos(4*pi*X) * cos(4*pi*Y)
-            Inh[idx] = 0.1 + 0.005 * cos(4.0*M_PI*xi) * cos(4.0*M_PI*eta);
+            Inh[idx] = 0.1 + 0.005 * cos(4.0*M_PI*xi) * cos(4.0*M_PI*eta);		// Perturbazione iniziale di Inh
             
-            // F: cos(pi*X) * cos(pi*Y)
-            F[idx] = 1.0 + 0.01 * cos(M_PI*xi) * cos(M_PI*eta);
+            F[idx] = 1.0 + 0.01 * cos(M_PI*xi) * cos(M_PI*eta);		// Perturbazione iniziale di F
         }
     }
     
-    // Diagnostica iniziale
-    diagnostics_record(diag, C, F, op, p, 0.0);
+    diagnostics_record(diag, C, F, op, p, 0.0);		// Salva diagnostica iniziale al tempo t=0
     
-    // Strang Splitting Loop: reaction(τ/2) → diffusion(τ) → reaction(τ/2)
-    double tau = p->tau;
-    double tau_half = tau / 2.0;
+    double tau = p->tau;		// Passo temporale completo
+    double tau_half = tau / 2.0;		// Mezzo passo temporale
     
-    for (int n = 0; n < p->Nsteps; n++) {
-        // Semi-passo reazione
-        reaction_step(C, P, Inh, F, taf, op, p, tau_half);
-        reaction_clamp_positive(C, P, Inh, F, M);
+    for (int n = 0; n < p->Nsteps; n++) {		// Ciclo temporale principale
+        reaction_step(C, P, Inh, F, taf, op, p, tau_half);		// Primo semi-passo di reazione
+        reaction_clamp_positive(C, P, Inh, F, M);		// Impone non negatività
         
-        // Passo diffusione ADI
-        adi_step(C, p, adi, p->dC, tau);
-        adi_step(P, p, adi, p->dP, tau);
-        adi_step(Inh, p, adi, p->dI, tau);
-        // F non diffonde (nota MATLAB)
+        adi_step(C, p, adi, p->dC, tau);		// Diffusione di C
+        adi_step(P, p, adi, p->dP, tau);		// Diffusione di P
+        adi_step(Inh, p, adi, p->dI, tau);		// Diffusione di Inh
+        // F non diffonde		// La variabile F non ha termine diffusivo
         
-        // Semi-passo reazione
-        reaction_step(C, P, Inh, F, taf, op, p, tau_half);
-        reaction_clamp_positive(C, P, Inh, F, M);
+        reaction_step(C, P, Inh, F, taf, op, p, tau_half);		// Secondo semi-passo di reazione
+        reaction_clamp_positive(C, P, Inh, F, M);		// Impone nuovamente non negatività
         
-        // Diagnostica
-        diagnostics_record(diag, C, F, op, p, (n+1)*tau);
+        diagnostics_record(diag, C, F, op, p, (n+1)*tau);		// Salva diagnostica al nuovo tempo
     }
     
-    // Stampa summary e salva diagnostics
-    diagnostics_print_summary(diag, p);
-    diagnostics_save_csv(diag, p, "output/csv/diagnostics_c.csv");
-    save_solution_to_csv(C, P, Inh, F, p, "output/csv/solution_c");
-    save_run_metadata(p, "output/csv/run_metadata.csv");
+    diagnostics_print_summary(diag, p);		// Stampa riepilogo finale della simulazione
+    diagnostics_save_csv(diag, p, "output/csv/diagnostics_c.csv");		// Salva diagnostica su CSV
+    save_solution_to_csv(C, P, Inh, F, p, "output/csv/solution_c");		// Salva soluzione finale
+    save_run_metadata(p, "output/csv/run_metadata.csv");		// Salva metadati dell'esecuzione
     
-    // Cleanup
-    free(C);
-    free(P);
-    free(Inh);
-    free(F);
-    diagnostics_free(diag);
-    adi_free(adi);
-    operators_free(op);
-    taf_free(taf);
-    grid_free(g);
-    params_free(p);
-    return 0;
+    free(C);		// Libera C
+    free(P);		// Libera P
+    free(Inh);		// Libera Inh
+    free(F);		// Libera F
+    diagnostics_free(diag);		// Libera diagnostica
+    adi_free(adi);		// Libera struttura ADI
+    operators_free(op);		// Libera operatori
+    taf_free(taf);		// Libera TAF
+    grid_free(g);		// Libera griglia
+    params_free(p);		// Libera parametri
+
+    return 0;		// Termina con successo
 }
