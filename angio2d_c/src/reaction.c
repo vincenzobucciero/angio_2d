@@ -61,14 +61,14 @@ void reaction_compute_rhs(ReactionWorkspace *ws,
     apply_gradient_x_2d(ws->gx_C, C, op, p);
     apply_gradient_y_2d(ws->gy_C, C, op, p);
 
-    #pragma omp parallel for if(M > 1024) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
         ws->vx[i] = p->alpha2 * ws->gx_I[i] - p->alpha1 * ws->gx_F[i] - p->alpha3 * taf->phi_x[i];
         ws->vy[i] = p->alpha2 * ws->gy_I[i] - p->alpha1 * ws->gy_F[i] - p->alpha3 * taf->phi_y[i];
         ws->div_v[i] = p->alpha2 * ws->lap_I[i] - p->alpha1 * ws->lap_F[i];
     }
 
-    #pragma omp parallel for if(M > 1024) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
         ws->C_rhs[i] = ws->vx[i] * ws->gx_C[i]
                      + ws->vy[i] * ws->gy_C[i]
@@ -87,7 +87,7 @@ void reaction_compute_rhs(ReactionWorkspace *ws,
 
 void reaction_euler_step(double *C, double *P, double *Inh, double *F,
                          const ReactionWorkspace *ws, double dt, int M) {
-    #pragma omp parallel for if(M > 1024) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
         C[i] = C[i] + dt * ws->C_rhs[i];
         P[i] = P[i] + dt * ws->P_rhs[i];
@@ -97,7 +97,7 @@ void reaction_euler_step(double *C, double *P, double *Inh, double *F,
 }
 
 void reaction_clamp_positive(double *C, double *P, double *Inh, double *F, int M) {
-    #pragma omp parallel for if(M > 1024) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
         if (C[i] < 0.0) C[i] = 0.0;
         if (P[i] < 0.0) P[i] = 0.0;

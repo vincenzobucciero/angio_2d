@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import datetime
 import math
 import os
 import shutil
@@ -17,7 +18,7 @@ BASELINE = ROOT / "output" / "baseline_serial"
 REPORT = ROOT / "output" / "csv" / "phase2_report.csv"
 
 FIELDS = ["C", "P", "Inh", "F"]
-THREADS = [1, 2, 4, 8]
+THREADS = [1, 2, 3, 4]  # Focus on lower thread counts to find sweet spot
 RUNS_PER_CASE = 5
 TOL = 1e-6
 
@@ -31,6 +32,9 @@ def run_solver(threads: int | None = None) -> tuple[float, str]:
     env = os.environ.copy()
     if threads is not None:
         env["OMP_NUM_THREADS"] = str(threads)
+    # Set thread affinity for better scaling
+    env["OMP_PROC_BIND"] = "close"
+    env["OMP_PLACES"] = "cores"
     t0 = time.perf_counter()
     code, out = run_cmd([str(ROOT / "build" / "angio2d")], env=env)
     dt = time.perf_counter() - t0
@@ -50,10 +54,16 @@ def read_flat_csv(path: Path) -> list[float]:
     vals: list[float] = []
     with path.open("r", newline="") as f:
         reader = csv.reader(f)
-        for row in reader:
+        for row_idx, row in enumerate(reader):
             for cell in row:
                 if cell.strip() == "":
                     continue
+                # Skip header row (first row with non-numeric values)
+                if row_idx == 0:
+                    try:
+                        float(cell)
+                    except ValueError:
+                        continue  # Skip this cell if it's part of the header
                 vals.append(float(cell))
     return vals
 
@@ -97,6 +107,8 @@ def write_report(rows: list[dict[str, str]]) -> None:
 
 
 def main() -> int:
+    start_time = datetime.datetime.now()
+    print(f"[START] {start_time.isoformat()}")
     print("[1/5] Build serial baseline")
     code, out = run_cmd(["make", "clean"])
     if code != 0:
@@ -108,8 +120,8 @@ def main() -> int:
         return 1
 
     print("[2/5] Run serial baseline")
-    dt, _ = run_solver()
-    print(f"serial baseline time: {dt:.3f}s")
+    dt_baseline, _ = run_solver()
+    print(f"serial baseline time: {dt_baseline:.3f}s")
     copy_outputs(BASELINE)
 
     print("[3/5] Build OpenMP")
@@ -125,7 +137,7 @@ def main() -> int:
 
     print("[4/5] Quick + Full")
     dt1, _ = run_solver(threads=1)
-    print(f"openmp threads=1 time: {dt1:.3f}s")
+    print(f"openmp threads=1 time: {dt1:.3f}s (baseline: {dt_baseline:.3f}s, overhead: {(dt1/dt_baseline - 1.0)*100:+.1f}%)")
     metrics = compare_against_baseline()
     for k, v in metrics.items():
         print(f"{k}: {v:.6e}")
@@ -145,12 +157,16 @@ def main() -> int:
             samples.append(t)
         med = statistics.median(samples)
         times[th] = med
+        speedup = dt_baseline / med
+        improvement_pct = (1.0 - med / dt_baseline) * 100.0
         rows.append({
             "threads": str(th),
             "median_seconds": f"{med:.6f}",
+            "speedup_vs_baseline": f"{speedup:.3f}x",
+            "improvement_percent": f"{improvement_pct:+.1f}%",
             "runs": str(RUNS_PER_CASE),
         })
-        print(f"threads={th}: median={med:.4f}s samples={','.join(f'{x:.4f}' for x in samples)}")
+        print(f"threads={th}: median={med:.4f}s speedup={speedup:.3f}x improvement={improvement_pct:+.1f}% samples={','.join(f'{x:.4f}' for x in samples)}")
 
     write_report(rows)
 
@@ -161,6 +177,11 @@ def main() -> int:
         print("WARN: speedup target 2x not reached on this hardware/build.")
     else:
         print("PASS: speedup target reached.")
+    
+    end_time = datetime.datetime.now()
+    elapsed = (end_time - start_time).total_seconds()
+    print(f"[END] {end_time.isoformat()}")
+    print(f"Total benchmark time: {elapsed:.1f}s")
 
     print(f"report saved: {REPORT}")
     return 0

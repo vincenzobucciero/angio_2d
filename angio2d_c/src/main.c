@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 600
 #include "params.h"		
 #include "grid.h"		
 #include "taf.h"		

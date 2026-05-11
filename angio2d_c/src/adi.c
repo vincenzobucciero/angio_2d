@@ -5,6 +5,9 @@
 #include <omp.h>
 #endif
 
+/* Cache line padding (typical L1: 64 bytes = 8 doubles) */
+#define CACHE_LINE_PAD 8
+
 ADI* adi_create(const Params *p) {
     ADI *adi = (ADI*) malloc(sizeof(ADI));
     if (!adi) {
@@ -30,10 +33,18 @@ ADI* adi_create(const Params *p) {
     adi->max_threads = 1;
 #endif
     adi->thomas_nmax = (p->Mx > p->My) ? p->Mx : p->My;
-    adi->thomas_c_star = (double*) malloc((size_t)adi->max_threads * (size_t)adi->thomas_nmax * sizeof(double));
-    adi->thomas_d_star = (double*) malloc((size_t)adi->max_threads * (size_t)adi->thomas_nmax * sizeof(double));
-    adi->rhs_col_buffer = (double*) malloc((size_t)adi->max_threads * (size_t)p->My * sizeof(double));
-    adi->sol_col_buffer = (double*) malloc((size_t)adi->max_threads * (size_t)p->My * sizeof(double));
+    
+    /* Allocate with cache-line padding to avoid false sharing */
+    int padded_nmax = adi->thomas_nmax + CACHE_LINE_PAD;
+    int padded_my = p->My + CACHE_LINE_PAD;
+    adi->thomas_c_star = (double*) malloc((size_t)adi->max_threads * (size_t)padded_nmax * sizeof(double));
+    adi->thomas_d_star = (double*) malloc((size_t)adi->max_threads * (size_t)padded_nmax * sizeof(double));
+    adi->rhs_col_buffer = (double*) malloc((size_t)adi->max_threads * (size_t)padded_my * sizeof(double));
+    adi->sol_col_buffer = (double*) malloc((size_t)adi->max_threads * (size_t)padded_my * sizeof(double));
+    
+    /* Store padded sizes for later indexing */
+    adi->padded_nmax = padded_nmax;
+    adi->padded_my = padded_my;
 
     if (!adi->ax || !adi->bx || !adi->cx ||
         !adi->ay || !adi->by || !adi->cy ||
@@ -134,8 +145,8 @@ void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau) 
 #ifdef _OPENMP
         tid = omp_get_thread_num();
 #endif
-        double *c_star = &adi->thomas_c_star[tid * adi->thomas_nmax];
-        double *d_star = &adi->thomas_d_star[tid * adi->thomas_nmax];
+        double *c_star = &adi->thomas_c_star[tid * adi->padded_nmax];
+        double *d_star = &adi->thomas_d_star[tid * adi->padded_nmax];
         thomas_solve_ws(adi->ax, adi->bx, adi->cx,
                         &adi->RHS[Mx * j], &adi->U_star[Mx * j], Mx,
                         c_star, d_star);
@@ -162,10 +173,10 @@ void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau) 
 #ifdef _OPENMP
         tid = omp_get_thread_num();
 #endif
-        double *c_star = &adi->thomas_c_star[tid * adi->thomas_nmax];
-        double *d_star = &adi->thomas_d_star[tid * adi->thomas_nmax];
-        double *rhs_col = &adi->rhs_col_buffer[tid * My];
-        double *sol_col = &adi->sol_col_buffer[tid * My];
+        double *c_star = &adi->thomas_c_star[tid * adi->padded_nmax];
+        double *d_star = &adi->thomas_d_star[tid * adi->padded_nmax];
+        double *rhs_col = &adi->rhs_col_buffer[tid * adi->padded_my];
+        double *sol_col = &adi->sol_col_buffer[tid * adi->padded_my];
 
         for (int j = 0; j < My; j++) {
             rhs_col[j] = adi->RHS2[i + Mx * j];

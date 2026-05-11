@@ -37,7 +37,7 @@ void apply_laplacian_2d(double *out, const double *in,
     const double inv_hx2 = op->inv_hx2;
     const double inv_hy2 = op->inv_hy2;
 
-    #pragma omp parallel for if(Mx * My > 1024) schedule(static)
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int j = 0; j < My; j++) {
         for (int i = 0; i < Mx; i++) {
             const int idx = i + Mx * j;
@@ -60,7 +60,7 @@ void apply_gradient_x_2d(double *out, const double *in,
     const int My = op->My;
     const double inv_2hx = op->inv_2hx;
 
-    #pragma omp parallel for if(Mx * My > 1024) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int j = 0; j < My; j++) {
         out[0 + Mx * j] = 0.0;
         for (int i = 1; i < Mx - 1; i++) {
@@ -78,7 +78,7 @@ void apply_gradient_y_2d(double *out, const double *in,
     const int My = op->My;
     const double inv_2hy = op->inv_2hy;
 
-    #pragma omp parallel for if(Mx * My > 1024) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < Mx; i++) {
         out[i + Mx * 0] = 0.0;
         for (int j = 1; j < My - 1; j++) {
