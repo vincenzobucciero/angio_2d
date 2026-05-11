@@ -5,7 +5,9 @@
 #include <omp.h>
 #endif
 
-/* Cache line padding (typical L1: 64 bytes = 8 doubles) */
+/* OPTIMIZATION: Cache-line padding constant (64 bytes typical L1 = 8 doubles)
+   Prevents false sharing: thread buffers allocated at tid * (size + PAD) offset
+   Ensures each thread's data resides on separate cache lines */
 #define CACHE_LINE_PAD 8
 
 ADI* adi_create(const Params *p) {
@@ -34,7 +36,10 @@ ADI* adi_create(const Params *p) {
 #endif
     adi->thomas_nmax = (p->Mx > p->My) ? p->Mx : p->My;
     
-    /* Allocate with cache-line padding to avoid false sharing */
+    /* OPTIMIZATION: Allocate with cache-line padding to avoid false sharing
+       Each thread gets buffer at offset: tid * (size + CACHE_LINE_PAD)
+       This ensures buffers don't share cache lines between threads
+       Without padding: threads on different cores invalidate each other's cache */
     int padded_nmax = adi->thomas_nmax + CACHE_LINE_PAD;
     int padded_my = p->My + CACHE_LINE_PAD;
     adi->thomas_c_star = (double*) malloc((size_t)adi->max_threads * (size_t)padded_nmax * sizeof(double));
@@ -145,6 +150,9 @@ void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau) 
 #ifdef _OPENMP
         tid = omp_get_thread_num();
 #endif
+        /* OPTIMIZATION: Index into padded buffer to prevent cache coherency misses
+           Each thread uses buffer at: tid * padded_nmax offset (not tid * nmax)
+           This guarantees no cache line sharing between thread buffers */
         double *c_star = &adi->thomas_c_star[tid * adi->padded_nmax];
         double *d_star = &adi->thomas_d_star[tid * adi->padded_nmax];
         thomas_solve_ws(adi->ax, adi->bx, adi->cx,
@@ -173,6 +181,8 @@ void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau) 
 #ifdef _OPENMP
         tid = omp_get_thread_num();
 #endif
+        /* OPTIMIZATION: Use padded offsets for thread-local buffers
+           Prevents multiple threads from sharing cache lines during backsolve */
         double *c_star = &adi->thomas_c_star[tid * adi->padded_nmax];
         double *d_star = &adi->thomas_d_star[tid * adi->padded_nmax];
         double *rhs_col = &adi->rhs_col_buffer[tid * adi->padded_my];

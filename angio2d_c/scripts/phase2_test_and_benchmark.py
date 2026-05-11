@@ -32,7 +32,10 @@ def run_solver(threads: int | None = None) -> tuple[float, str]:
     env = os.environ.copy()
     if threads is not None:
         env["OMP_NUM_THREADS"] = str(threads)
-    # Set thread affinity for better scaling
+    # OPTIMIZATION: Set thread affinity for better scalability
+    # OMP_PROC_BIND=close: Keep threads on nearby cores (same socket)
+    # OMP_PLACES=cores: Bind to physical cores, not SMT threads
+    # This reduces context switching and improves cache locality
     env["OMP_PROC_BIND"] = "close"
     env["OMP_PLACES"] = "cores"
     t0 = time.perf_counter()

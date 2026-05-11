@@ -33,8 +33,9 @@ typedef struct {
     double *sol_col_buffer;  /* Buffer colonne soluzione per thread */
     int max_threads;         /* Numero massimo thread supportati */
     int thomas_nmax;         /* Massima dimensione sistema Thomas */
-    int padded_nmax;         /* Padded size for cache-line alignment */
-    int padded_my;           /* Padded My for cache-line alignment */
+    /* OPTIMIZATION: Cache-line padding to prevent false sharing between threads */
+    int padded_nmax;         /* Padded size for cache-line alignment (nmax + 8 doubles) */
+    int padded_my;           /* Padded My for cache-line alignment (My + 8 doubles) */
     
     int Mx, My;			/* Dimensioni della griglia */
 } ADI;

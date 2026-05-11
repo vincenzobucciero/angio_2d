@@ -70,6 +70,9 @@ void reaction_compute_rhs(ReactionWorkspace *ws,
 
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
+        /* OPTIMIZATION: Removed if(M > 1024) guard - always parallelize
+           Aggressive parallelization reduces fork/join overhead overhead for small M
+           RHS computation is element-wise with no spatial dependency */
         ws->C_rhs[i] = ws->vx[i] * ws->gx_C[i]
                      + ws->vy[i] * ws->gy_C[i]
                      + ws->div_v[i] * C[i]
@@ -87,6 +90,8 @@ void reaction_compute_rhs(ReactionWorkspace *ws,
 
 void reaction_euler_step(double *C, double *P, double *Inh, double *F,
                          const ReactionWorkspace *ws, double dt, int M) {
+    /* OPTIMIZATION: Removed if(M > 1024) guard - always parallelize
+       Time integration is element-wise, embarrassingly parallel */
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
         C[i] = C[i] + dt * ws->C_rhs[i];
@@ -97,6 +102,8 @@ void reaction_euler_step(double *C, double *P, double *Inh, double *F,
 }
 
 void reaction_clamp_positive(double *C, double *P, double *Inh, double *F, int M) {
+    /* OPTIMIZATION: Removed if(M > 1024) guard - always parallelize
+       Element-wise min operation, fully parallelizable */
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < M; i++) {
         if (C[i] < 0.0) C[i] = 0.0;
