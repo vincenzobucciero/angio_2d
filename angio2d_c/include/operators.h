@@ -17,9 +17,10 @@
  */
 
 typedef struct {
-    double *Lx, *Ly;    // Laplaciano 1D (Mx×Mx, My×My) - DENSI
-    double *Gx, *Gy;    // Gradienti 1D (Mx×Mx, My×My) - DENSI
     int Mx, My;
+    double hx, hy;
+    double inv_hx2, inv_hy2;
+    double inv_2hx, inv_2hy;
 } Operators;
 
 /**

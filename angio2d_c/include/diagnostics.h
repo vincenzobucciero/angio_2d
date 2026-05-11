@@ -20,6 +20,9 @@ typedef struct {
     double *mC;		/* Massa di C */
     double *mF;		/* Massa di F */
     double *En;		/* Energia */
+    double *gx_C;    /* Workspace gradiente x di C */
+    double *gy_C;    /* Workspace gradiente y di C */
+    int M;           /* Numero totale nodi */
     int step;		/* Contatore timestep */
 } Diagnostics;
 
@@ -33,7 +36,7 @@ typedef struct {
  *   puntatore a Diagnostics inizializzato
  *   oppure NULL in caso di errore
  */
-Diagnostics* diagnostics_create(int Nsteps);
+Diagnostics* diagnostics_create(int Nsteps, int M);
 
 /*
  * Libera la memoria associata alla struttura Diagnostics.

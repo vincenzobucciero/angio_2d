@@ -25,6 +25,7 @@
 typedef struct {
     double *C_rhs, *P_rhs, *Inh_rhs, *F_rhs;  // RHS temporanei
     double *vx, *vy;                           // Velocità
+    double *div_v;                             // Divergenza velocità
     double *lap_I, *lap_F;                     // Laplaciani
     double *gx_I, *gy_I;                       // Gradienti Inh
     double *gx_F, *gy_F;                       // Gradienti F
@@ -67,6 +68,11 @@ void reaction_clamp_positive(double *C, double *P, double *Inh, double *F, int M
 void reaction_step(double *C, double *P, double *Inh, double *F,
                    const TAF *taf, const Operators *op,
                    const Params *p, double dt);
+
+void reaction_step_with_workspace(double *C, double *P, double *Inh, double *F,
+                                  const TAF *taf, const Operators *op,
+                                  const Params *p, double dt,
+                                  ReactionWorkspace *ws);
 
 /**
  * Dealloca workspace

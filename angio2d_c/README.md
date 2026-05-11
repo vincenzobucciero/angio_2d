@@ -98,6 +98,34 @@ make compare PYTHON=../.venv/bin/python
 make pipeline PYTHON=../.venv/bin/python
 ```
 
+## OpenMP (fase 2)
+
+La parallelizzazione CPU e` opzionale ed e` attivata via flag build:
+
+```bash
+make clean
+make USE_OPENMP=1
+OMP_NUM_THREADS=4 ./build/angio2d
+```
+
+Se il compilatore non supporta `-fopenmp`, puoi passare flag custom:
+
+```bash
+make USE_OPENMP=1 OPENMP_CFLAGS=\"...\" OPENMP_LDFLAGS=\"...\"
+```
+
+### Test + benchmark fase 2 (quick/full/stress)
+
+Script unico per:
+- baseline seriale
+- build OpenMP
+- verifica numerica vs baseline (`RelL2 <= 1e-6`)
+- benchmark thread `1,2,4,8` (5 run, mediana)
+
+```bash
+python3 scripts/phase2_test_and_benchmark.py
+```
+
 Generare solo le figure:
 
 ```bash

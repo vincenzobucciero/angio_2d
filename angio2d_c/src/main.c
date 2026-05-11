@@ -10,6 +10,9 @@
 #include <stdio.h>		
 #include <math.h>		
 #include <sys/stat.h>		
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 /*
  * Crea le directory di output necessarie per la simulazione.
@@ -69,7 +72,7 @@ int main(void) {
         return 1;		// Esce
     }
     
-    Diagnostics *diag = diagnostics_create(p->Nsteps);		// Alloca diagnostica temporale
+    Diagnostics *diag = diagnostics_create(p->Nsteps, p->Mx * p->My);		// Alloca diagnostica temporale
     if (!diag) {		// Controlla errore
         adi_free(adi);		// Libera ADI
         operators_free(op);		// Libera operatori
@@ -99,12 +102,28 @@ int main(void) {
         params_free(p);		// Libera parametri
         return 1;		// Esce con errore
     }
+
+    ReactionWorkspace *rws = reaction_workspace_create(M);
+    if (!rws) {
+        free(C);
+        free(P);
+        free(Inh);
+        free(F);
+        diagnostics_free(diag);
+        adi_free(adi);
+        operators_free(op);
+        taf_free(taf);
+        grid_free(g);
+        params_free(p);
+        return 1;
+    }
     
     // Inizializza condizioni iniziali da griglia (grid coordinate X[], Y[])
     // MATLAB: C = p.C0 * 0.5 * (1 - tanh((X - p.a)/p.sigma_IC))
     // MATLAB: P = 0.1 + 0.01 * cos(2*pi*X) * cos(2*pi*Y)
     // MATLAB: Inh = 0.1 + 0.005 * cos(4*pi*X) * cos(4*pi*Y)
     // MATLAB: F = 1.0 + 0.01 * cos(pi*X) * cos(pi*Y)
+    #pragma omp parallel for collapse(2) if(p->Mx * p->My > 1024) schedule(static)
     for (int j = 0; j < p->My; j++) {		// Loop su y
         for (int i = 0; i < p->Mx; i++) {		// Loop su x
             int idx = i + p->Mx * j;		// Indice lineare del nodo (i,j)
@@ -128,7 +147,7 @@ int main(void) {
     double tau_half = tau / 2.0;		// Mezzo passo temporale
     
     for (int n = 0; n < p->Nsteps; n++) {		// Ciclo temporale principale
-        reaction_step(C, P, Inh, F, taf, op, p, tau_half);		// Primo semi-passo di reazione
+        reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Primo semi-passo di reazione
         reaction_clamp_positive(C, P, Inh, F, M);		// Impone non negatività
         
         adi_step(C, p, adi, p->dC, tau);		// Diffusione di C
@@ -136,7 +155,7 @@ int main(void) {
         adi_step(Inh, p, adi, p->dI, tau);		// Diffusione di Inh
         // F non diffonde		// La variabile F non ha termine diffusivo
         
-        reaction_step(C, P, Inh, F, taf, op, p, tau_half);		// Secondo semi-passo di reazione
+        reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Secondo semi-passo di reazione
         reaction_clamp_positive(C, P, Inh, F, M);		// Impone nuovamente non negatività
         
         diagnostics_record(diag, C, F, op, p, (n+1)*tau);		// Salva diagnostica al nuovo tempo
@@ -151,6 +170,7 @@ int main(void) {
     free(P);		// Libera P
     free(Inh);		// Libera Inh
     free(F);		// Libera F
+    reaction_workspace_free(rws);    // Libera workspace reazione
     diagnostics_free(diag);		// Libera diagnostica
     adi_free(adi);		// Libera struttura ADI
     operators_free(op);		// Libera operatori

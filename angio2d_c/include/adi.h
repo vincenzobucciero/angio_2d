@@ -27,6 +27,12 @@ typedef struct {
     double *RHS2;			/* Termine noto secondo semi-passo */
     
     double *U_star;			/* Soluzione intermedia */
+    double *thomas_c_star;   /* Workspace Thomas per thread */
+    double *thomas_d_star;   /* Workspace Thomas per thread */
+    double *rhs_col_buffer;  /* Buffer colonne RHS per thread */
+    double *sol_col_buffer;  /* Buffer colonne soluzione per thread */
+    int max_threads;         /* Numero massimo thread supportati */
+    int thomas_nmax;         /* Massima dimensione sistema Thomas */
     
     int Mx, My;			/* Dimensioni della griglia */
 } ADI;
@@ -69,6 +75,10 @@ void adi_free(ADI *adi);
  */
 void thomas_solve(const double *a, const double *b, const double *c,
                   const double *d, double *x, int n);
+
+void thomas_solve_ws(const double *a, const double *b, const double *c,
+                     const double *d, double *x, int n,
+                     double *c_star, double *d_star);
 
 /*
  * Esegue un passo diffusivo usando lo schema ADI.
