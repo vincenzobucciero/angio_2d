@@ -121,47 +121,48 @@ La formulazione del problema e la scelta dello schema numerico sono coerenti con
 
 ## OpenMP Benchmark (HPC Phase 2)
 
-All benchmarking infrastructure is located in `angio2d_c/`. See [angio2d_c/BENCHMARK.md](angio2d_c/BENCHMARK.md) for detailed documentation.
+The OpenMP benchmark workflow is fully reproducible through YAML + Python scripts and supports both local execution and SLURM submission.
 
-### Quick Start
+### Run Workflow
 
-**Run via sbatch (HPC cluster):**
+Local:
+
 ```bash
-cd angio2d_c
-sbatch jobs/run_openmp_benchmark.sbatch
-```
-
-**Run interactively (local machine):**
-```bash
-cd angio2d_c
 python3 scripts/run_openmp_benchmark_from_config.py --config configs/openmp_benchmark.yaml
 ```
 
-**Benchmark single grid (quick test):**
+SLURM:
+
 ```bash
-cd angio2d_c
-python3 scripts/run_openmp_benchmark_from_config.py --config configs/openmp_benchmark.yaml --grid 256
+sbatch jobs/run_openmp_benchmark.sbatch configs/openmp_benchmark.yaml
 ```
 
-### Results
+### Final Benchmark Suite
 
-Results are saved to `angio2d_c/results/openmp_scaling/`:
+- Grids: `64x64`, `128x128`, `256x256`
+- Threads: `1, 2, 3, 4`
+- Repetitions: `5 runs/configuration`
+- Backend: OpenMP CPU
+- `512x512` is **not included** in the final suite due to current HPC cost/stability constraints.
 
-- **CSV:** `openmp_benchmark_YYYYMMDD_HHMMSS.csv` (timestamped)
-- **Summary:** `openmp_benchmark_YYYYMMDD_HHMMSS.md` (markdown tables)
-- **Latest:** `openmp_benchmark_latest.csv` and `.md` (symlinks to most recent)
-- **Logs:** `logs/benchmark.log`, `logs/benchmark_<JOBID>.log`
+### Professional Reporting Artifacts
 
-### Expected Performance
+Generate presentation-ready HPC reporting:
 
-| Grid | Serial | t=4 Speedup | Efficiency |
-|------|--------|-------------|-----------|
-| 64×64 | ~0.5s | 2.4x | 60% |
-| 128×128 | ~15s | 3.5x | 88% |
-| 256×256 | ~300s | 3.8x | 95% |
+```bash
+python3 scripts/generate_openmp_reporting.py
+```
 
-### Configuration
+This creates:
 
-Edit `angio2d_c/configs/openmp_benchmark.yaml` to customize grid sizes, thread counts, and other parameters. Grid 512×512 is optional (long-running, ~1000s per run).
+`results/openmp_scaling/`
 
-For full documentation, see [angio2d_c/BENCHMARK.md](angio2d_c/BENCHMARK.md).
+- `csv/`: raw runs, performance summary, best-per-grid table, numerical validation table
+- `plots/`: `runtime_vs_threads.png`, `speedup_vs_threads.png`, `efficiency_vs_threads.png`, `runtime_vs_grid.png`
+- `logs/`: report generation log
+- `figures/`: solver final figures grouped by best thread per grid
+- `summaries/`: structured technical summary for report/presentation
+
+For a full technical discussion and interpretation, see:
+
+- `docs/phase2_openmp_results.md`
