@@ -1,6 +1,10 @@
 #include "adi.h"
+#ifdef USE_CUDA
+#include "adi_cuda.h"
+#endif
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -104,6 +108,21 @@ void thomas_solve(const double *a, const double *b, const double *c,
 void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau) {
     const int Mx = p->Mx;
     const int My = p->My;
+
+#ifdef USE_CUDA
+    static int cuda_fallback_warned = 0;
+    const char *backend = getenv("ANGIO2D_BACKEND");
+    if (backend && strcmp(backend, "cuda") == 0) {
+        int cuda_rc = adi_cuda_step(u, Mx, My, p->hx, p->hy, d_coeff, tau);
+        if (cuda_rc == 0) {
+            return;
+        }
+        if (!cuda_fallback_warned) {
+            fprintf(stderr, "WARN: CUDA ADI path unavailable (rc=%d), falling back to CPU ADI.\n", cuda_rc);
+            cuda_fallback_warned = 1;
+        }
+    }
+#endif
 
     const double tau2 = tau / 2.0;
     const double rx = d_coeff * tau2 / (p->hx * p->hx);

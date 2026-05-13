@@ -12,10 +12,10 @@ from _pipeline_core import ROOT, _load_yaml, resolve_output_root, run_benchmark_
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="DEPRECATED: use scripts/run_batch.py")
-    parser.add_argument("--config", type=str, default="configs/openmp_benchmark.yaml")
+    parser.add_argument("--config", type=str, default="configs/cuda_benchmark.yaml")
     parser.add_argument("--grid", type=int, help="Optional single-grid override")
-    parser.add_argument("--threads", type=int, help="Optional single-thread override")
     parser.add_argument("--runs", type=int, help="Optional runs override")
+    parser.add_argument("--threads", type=int, help="Optional host-thread override")
     return parser.parse_args()
 
 
@@ -30,19 +30,18 @@ def main() -> int:
     config = _load_yaml(cfg_path)
     if args.grid is not None:
         config["grid_sizes"] = [args.grid]
-    if args.threads is not None:
-        config["threads"] = [args.threads]
     if args.runs is not None:
         config["runs"] = args.runs
+    if args.threads is not None:
+        config["threads"] = [args.threads]
 
     print(
-        "DEPRECATION WARNING: use 'python3 scripts/run_batch.py --config configs/run_profile.yaml'",
+        "DEPRECATION WARNING: use 'python3 scripts/run_batch.py --config configs/run_profile.yaml --backend cuda'",
         file=sys.stderr,
     )
 
-    config["backend"] = "openmp"
+    config["backend"] = "cuda"
     outdir = resolve_output_root(config)
-
     return run_benchmark_from_profile(config=config, output_dir=outdir)
 
 
