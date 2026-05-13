@@ -1,1 +1,11 @@
 .venv/
+
+# Benchmark/runtime artifacts (keep repo clean)
+angio2d_c/output/*threads/
+angio2d_c/output/*/run-*/
+angio2d_c/output/csv/
+angio2d_c/output/figures/
+angio2d_c/output/_slurm/
+angio2d_c/output/openmp_speedup_summary.csv
+angio2d_c/output/openmp_speedup_summary.md
+angio2d_c/output/presentation_openmp_summary.md

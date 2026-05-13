@@ -1,0 +1,9 @@
+backend: openmp
+grid_sizes: [64, 128, 256]
+threads: [1, 2, 3, 4]
+runs: 5
+validate_against_serial: true
+generate_plots: true
+output_dir: angio2d_c/output
+timeout_per_run: 600
+continue_on_failure: true
