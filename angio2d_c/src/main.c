@@ -9,6 +9,7 @@
 #include "output.h"		
 #include <stdlib.h>		
 #include <stdio.h>		
+#include <string.h>
 #include <math.h>		
 #include <sys/stat.h>		
 #ifdef _OPENMP
@@ -30,17 +31,45 @@ static void ensure_output_dirs(void) {
 /*
  * Funzione principale del programma.
  *
+ * Argomenti CLI (opzionali):
+ *   --config <path>      : Path to YAML config file
+ *   --grid-index <idx>   : Grid index in config (0, 1, 2, ...)
+ *
+ * Esempio:
+ *   ./angio2d                                    # Default 64x64
+ *   ./angio2d --config ../configs/benchmark.yaml --grid-index 1  # 128x128
+ *
  * Flusso generale:
- * 1) crea directory di output
- * 2) inizializza parametri, griglia, TAF, operatori, ADI, diagnostica
- * 3) alloca e inizializza le variabili di stato
- * 4) esegue il ciclo temporale con Strang splitting
- * 5) salva risultati e libera memoria
+ * 1) parse CLI arguments
+ * 2) crea directory di output
+ * 3) inizializza parametri, griglia, TAF, operatori, ADI, diagnostica
+ * 4) alloca e inizializza le variabili di stato
+ * 5) esegue il ciclo temporale con Strang splitting
+ * 6) salva risultati e libera memoria
  */
-int main(void) {
+int main(int argc, char *argv[]) {
+    /* Parse CLI arguments */
+    const char *config_path = NULL;
+    int grid_index = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
+            config_path = argv[++i];
+        } else if (strcmp(argv[i], "--grid-index") == 0 && i + 1 < argc) {
+            grid_index = atoi(argv[++i]);
+        }
+    }
+
     ensure_output_dirs();		// Assicura l'esistenza delle directory di output
 
-    Params *p = params_init();		// Inizializza i parametri del modello
+    /* Initialize params: use config if provided, else default */
+    Params *p;
+    if (config_path) {
+        p = params_init_from_yaml(config_path, grid_index);
+    } else {
+        p = params_init();
+    }
+    
     if (!p) return 1;		// Esce se l'inizializzazione fallisce
     
     Grid *g = grid_create(p);		// Costruisce la griglia cartesiana uniforme

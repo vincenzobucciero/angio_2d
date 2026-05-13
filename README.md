@@ -116,3 +116,52 @@ Questo comando avvia direttamente l'applicazione MATLAB con la GUI. Una volta ap
 ## Riferimento concettuale
 
 La formulazione del problema e la scelta dello schema numerico sono coerenti con il PDF allegato, che introduce un'estensione bidimensionale del modello classico di angiogenesi tumorale e motiva l'uso di operator splitting e ADI per ridurre il costo computazionale della parte diffusiva.
+
+---
+
+## OpenMP Benchmark (HPC Phase 2)
+
+All benchmarking infrastructure is located in `angio2d_c/`. See [angio2d_c/BENCHMARK.md](angio2d_c/BENCHMARK.md) for detailed documentation.
+
+### Quick Start
+
+**Run via sbatch (HPC cluster):**
+```bash
+cd angio2d_c
+sbatch jobs/run_openmp_benchmark.sbatch
+```
+
+**Run interactively (local machine):**
+```bash
+cd angio2d_c
+python3 scripts/run_openmp_benchmark_from_config.py --config configs/openmp_benchmark.yaml
+```
+
+**Benchmark single grid (quick test):**
+```bash
+cd angio2d_c
+python3 scripts/run_openmp_benchmark_from_config.py --config configs/openmp_benchmark.yaml --grid 256
+```
+
+### Results
+
+Results are saved to `angio2d_c/results/openmp_scaling/`:
+
+- **CSV:** `openmp_benchmark_YYYYMMDD_HHMMSS.csv` (timestamped)
+- **Summary:** `openmp_benchmark_YYYYMMDD_HHMMSS.md` (markdown tables)
+- **Latest:** `openmp_benchmark_latest.csv` and `.md` (symlinks to most recent)
+- **Logs:** `logs/benchmark.log`, `logs/benchmark_<JOBID>.log`
+
+### Expected Performance
+
+| Grid | Serial | t=4 Speedup | Efficiency |
+|------|--------|-------------|-----------|
+| 64×64 | ~0.5s | 2.4x | 60% |
+| 128×128 | ~15s | 3.5x | 88% |
+| 256×256 | ~300s | 3.8x | 95% |
+
+### Configuration
+
+Edit `angio2d_c/configs/openmp_benchmark.yaml` to customize grid sizes, thread counts, and other parameters. Grid 512×512 is optional (long-running, ~1000s per run).
+
+For full documentation, see [angio2d_c/BENCHMARK.md](angio2d_c/BENCHMARK.md).

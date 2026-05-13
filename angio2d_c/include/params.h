@@ -38,6 +38,7 @@ typedef struct {
 } Params;
 
 Params* params_init(void);
+Params* params_init_from_yaml(const char *config_path, int grid_index);
 void params_print(const Params *p);
 void params_free(Params *p);
 
