@@ -11,3 +11,9 @@ angio2d_c/output/openmp_speedup_summary.md
 angio2d_c/output/presentation_openmp_summary.md
 
 .vscode/
+
+# CUDA/OpenMP binaries
+angio2d_c/bin/
+
+# Python cache
+scripts/__pycache__/

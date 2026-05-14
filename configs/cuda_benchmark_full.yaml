@@ -1,0 +1,19 @@
+backend: cuda
+
+grid_sizes:
+  - 64
+  - 128
+  - 256
+
+threads:
+  - 1
+
+runs: 1
+
+validate_against_serial: false
+generate_plots: false
+
+output_root: angio2d_c/output
+
+timeout_per_run: 1800
+continue_on_failure: false
