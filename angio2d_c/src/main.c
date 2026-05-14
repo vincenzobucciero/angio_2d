@@ -7,6 +7,9 @@
 #include "adi.h"		
 #include "diagnostics.h"		
 #include "output.h"		
+#ifdef USE_CUDA
+#include "adi_cuda.h"
+#endif
 #include <stdlib.h>		
 #include <stdio.h>		
 #include <string.h>
@@ -176,6 +179,10 @@ int main(int argc, char *argv[]) {
     
     double tau = p->tau;		// Passo temporale completo
     double tau_half = tau / 2.0;		// Mezzo passo temporale
+#ifdef USE_CUDA
+    const char *backend = getenv("ANGIO2D_BACKEND");
+    const int use_cuda_backend = (backend && strcmp(backend, "cuda") == 0);
+#endif
     
     /* Timing for main loop */
     struct timespec t_start, t_end;
@@ -185,9 +192,25 @@ int main(int argc, char *argv[]) {
         reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Primo semi-passo di reazione
         reaction_clamp_positive(C, P, Inh, F, M);		// Impone non negatività
         
+        #ifdef USE_CUDA
+        if (use_cuda_backend) {
+            int cuda_rc = adi_cuda_step_triplet(C, p->dC, P, p->dP, Inh, p->dI,
+                                                p->Mx, p->My, p->hx, p->hy, tau);
+            if (cuda_rc != 0) {
+                adi_step(C, p, adi, p->dC, tau);		// Fallback Diffusione di C
+                adi_step(P, p, adi, p->dP, tau);		// Fallback Diffusione di P
+                adi_step(Inh, p, adi, p->dI, tau);		// Fallback Diffusione di Inh
+            }
+        } else {
+            adi_step(C, p, adi, p->dC, tau);		// Diffusione di C
+            adi_step(P, p, adi, p->dP, tau);		// Diffusione di P
+            adi_step(Inh, p, adi, p->dI, tau);		// Diffusione di Inh
+        }
+        #else
         adi_step(C, p, adi, p->dC, tau);		// Diffusione di C
         adi_step(P, p, adi, p->dP, tau);		// Diffusione di P
         adi_step(Inh, p, adi, p->dI, tau);		// Diffusione di Inh
+        #endif
         // F non diffonde		// La variabile F non ha termine diffusivo
         
         reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Secondo semi-passo di reazione

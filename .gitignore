@@ -19,6 +19,7 @@ angio2d_c/output/openmp_speedup_summary.md
 angio2d_c/output/presentation_openmp_summary.md
 
 # CUDA profiling raw data (keep only summary.md and timing.csv)
+results/cuda_profiling/run_*/benchmark.yaml
 results/cuda_profiling/run_*/output/csv/
 !results/cuda_profiling/run_*/output/csv/timing.csv
 results/cuda_profiling/run_*/output/*.txt

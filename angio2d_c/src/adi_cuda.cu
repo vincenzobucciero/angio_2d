@@ -159,8 +159,11 @@ typedef struct {
     
     /* Device arrays */
     double *d_u, *d_rhs, *d_u_star;
+    double *d_u_batch[3];
     double *d_ax, *d_bx, *d_cx;
     double *d_ay, *d_by, *d_cy;
+    double *h_ax, *h_bx, *h_cx;
+    double *h_ay, *h_by, *h_cy;
     
     /* cuSPARSE context */
     cusparseHandle_t cusparse_handle;
@@ -172,6 +175,32 @@ typedef struct {
 static ADI_CUDA_Context g_adi_cuda_ctx = {0};
 static int g_adi_cuda_initialized = 0;
 static int g_adi_step_count = 0;
+
+static void setup_coefficients_host(int Mx, int My, double hx, double hy, double d_coeff, double tau) {
+    double tau2 = tau / 2.0;
+    double rx = d_coeff * tau2 / (hx * hx);
+    double ry = d_coeff * tau2 / (hy * hy);
+
+    for (int i = 0; i < Mx; i++) {
+        g_adi_cuda_ctx.h_ax[i] = -rx;
+        g_adi_cuda_ctx.h_bx[i] = 1.0 + 2.0 * rx;
+        g_adi_cuda_ctx.h_cx[i] = -rx;
+    }
+    g_adi_cuda_ctx.h_ax[0] = 0.0;
+    g_adi_cuda_ctx.h_cx[0] = -2.0 * rx;
+    g_adi_cuda_ctx.h_ax[Mx - 1] = -2.0 * rx;
+    g_adi_cuda_ctx.h_cx[Mx - 1] = 0.0;
+
+    for (int j = 0; j < My; j++) {
+        g_adi_cuda_ctx.h_ay[j] = -ry;
+        g_adi_cuda_ctx.h_by[j] = 1.0 + 2.0 * ry;
+        g_adi_cuda_ctx.h_cy[j] = -ry;
+    }
+    g_adi_cuda_ctx.h_ay[0] = 0.0;
+    g_adi_cuda_ctx.h_cy[0] = -2.0 * ry;
+    g_adi_cuda_ctx.h_ay[My - 1] = -2.0 * ry;
+    g_adi_cuda_ctx.h_cy[My - 1] = 0.0;
+}
 
 /* ============================================================================
  * CUDA initialization and cleanup
@@ -207,6 +236,18 @@ static int adi_cuda_init(int Mx, int My) {
         cudaFree(g_adi_cuda_ctx.d_u);
         cudaFree(g_adi_cuda_ctx.d_rhs);
         return 1;
+    }
+
+    for (int k = 0; k < 3; k++) {
+        err = cudaMalloc((void**)&g_adi_cuda_ctx.d_u_batch[k], M * sizeof(double));
+        if (err != cudaSuccess) {
+            fprintf(stderr, "ERROR: cudaMalloc d_u_batch[%d] failed: %s\n", k, cudaGetErrorString(err));
+            while (--k >= 0) cudaFree(g_adi_cuda_ctx.d_u_batch[k]);
+            cudaFree(g_adi_cuda_ctx.d_u);
+            cudaFree(g_adi_cuda_ctx.d_rhs);
+            cudaFree(g_adi_cuda_ctx.d_u_star);
+            return 1;
+        }
     }
     
     /* Allocate coefficient arrays */
@@ -303,6 +344,18 @@ static int adi_cuda_init(int Mx, int My) {
     cudaEventCreate(&g_adi_cuda_ctx.event_d2h);
     cudaEventCreate(&g_adi_cuda_ctx.event_end);
     
+    g_adi_cuda_ctx.h_ax = (double*)malloc((size_t)Mx * sizeof(double));
+    g_adi_cuda_ctx.h_bx = (double*)malloc((size_t)Mx * sizeof(double));
+    g_adi_cuda_ctx.h_cx = (double*)malloc((size_t)Mx * sizeof(double));
+    g_adi_cuda_ctx.h_ay = (double*)malloc((size_t)My * sizeof(double));
+    g_adi_cuda_ctx.h_by = (double*)malloc((size_t)My * sizeof(double));
+    g_adi_cuda_ctx.h_cy = (double*)malloc((size_t)My * sizeof(double));
+    if (!g_adi_cuda_ctx.h_ax || !g_adi_cuda_ctx.h_bx || !g_adi_cuda_ctx.h_cx ||
+        !g_adi_cuda_ctx.h_ay || !g_adi_cuda_ctx.h_by || !g_adi_cuda_ctx.h_cy) {
+        fprintf(stderr, "ERROR: host coefficient allocation failed\n");
+        return 1;
+    }
+
     g_adi_cuda_initialized = 1;
     return 0;
 }
@@ -313,6 +366,9 @@ static void adi_cuda_cleanup(void) {
     cudaFree(g_adi_cuda_ctx.d_u);
     cudaFree(g_adi_cuda_ctx.d_rhs);
     cudaFree(g_adi_cuda_ctx.d_u_star);
+    for (int k = 0; k < 3; k++) {
+        cudaFree(g_adi_cuda_ctx.d_u_batch[k]);
+    }
     cudaFree(g_adi_cuda_ctx.d_ax);
     cudaFree(g_adi_cuda_ctx.d_bx);
     cudaFree(g_adi_cuda_ctx.d_cx);
@@ -330,8 +386,40 @@ static void adi_cuda_cleanup(void) {
     cudaEventDestroy(g_adi_cuda_ctx.event_y_sweep);
     cudaEventDestroy(g_adi_cuda_ctx.event_d2h);
     cudaEventDestroy(g_adi_cuda_ctx.event_end);
+    free(g_adi_cuda_ctx.h_ax);
+    free(g_adi_cuda_ctx.h_bx);
+    free(g_adi_cuda_ctx.h_cx);
+    free(g_adi_cuda_ctx.h_ay);
+    free(g_adi_cuda_ctx.h_by);
+    free(g_adi_cuda_ctx.h_cy);
     
     g_adi_cuda_initialized = 0;
+}
+
+static int adi_cuda_diffuse_device_array(double *d_u, int Mx, int My, double hx, double hy, double d_coeff, double tau) {
+    int M = Mx * My;
+    double tau2 = tau / 2.0;
+    double rx = d_coeff * tau2 / (hx * hx);
+    double ry = d_coeff * tau2 / (hy * hy);
+
+    setup_coefficients_host(Mx, My, hx, hy, d_coeff, tau);
+    cudaMemcpy(g_adi_cuda_ctx.d_ax, g_adi_cuda_ctx.h_ax, Mx * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(g_adi_cuda_ctx.d_bx, g_adi_cuda_ctx.h_bx, Mx * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(g_adi_cuda_ctx.d_cx, g_adi_cuda_ctx.h_cx, Mx * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(g_adi_cuda_ctx.d_ay, g_adi_cuda_ctx.h_ay, My * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(g_adi_cuda_ctx.d_by, g_adi_cuda_ctx.h_by, My * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(g_adi_cuda_ctx.d_cy, g_adi_cuda_ctx.h_cy, My * sizeof(double), cudaMemcpyHostToDevice);
+
+    int block_size = 256;
+    int grid_size = (M + block_size - 1) / block_size;
+    compute_rhs_x<<<grid_size, block_size>>>(d_u, g_adi_cuda_ctx.d_rhs, Mx, My, ry);
+    thomas_solve_batch_x<<<My, 1>>>(g_adi_cuda_ctx.d_ax, g_adi_cuda_ctx.d_bx, g_adi_cuda_ctx.d_cx,
+                                    g_adi_cuda_ctx.d_rhs, g_adi_cuda_ctx.d_u_star, Mx, My, Mx);
+    compute_rhs_y<<<grid_size, block_size>>>(g_adi_cuda_ctx.d_u_star, g_adi_cuda_ctx.d_rhs, Mx, My, rx);
+    int grid_y = (Mx + 32 - 1) / 32;
+    thomas_solve_batch_y<<<grid_y, 32>>>(g_adi_cuda_ctx.d_ay, g_adi_cuda_ctx.d_by, g_adi_cuda_ctx.d_cy,
+                                         g_adi_cuda_ctx.d_rhs, d_u, My, Mx);
+    return (cudaGetLastError() == cudaSuccess) ? 0 : 1;
 }
 
 /* ============================================================================
@@ -374,73 +462,12 @@ int adi_cuda_step(double *u, int Mx, int My, double hx, double hy, double d_coef
     }
     cudaEventRecord(g_adi_cuda_ctx.event_h2d, 0);
     
-    /* === PHASE 2: Setup coefficients === */
-    double tau2 = tau / 2.0;
-    double rx = d_coeff * tau2 / (hx * hx);
-    double ry = d_coeff * tau2 / (hy * hy);
-    
-    /* Setup x-coefficients on CPU (could be on GPU if needed) */
-    double *ax = (double*)malloc(Mx * sizeof(double));
-    double *bx = (double*)malloc(Mx * sizeof(double));
-    double *cx = (double*)malloc(Mx * sizeof(double));
-    
-    for (int i = 0; i < Mx; i++) {
-        ax[i] = -rx;
-        bx[i] = 1.0 + 2.0 * rx;
-        cx[i] = -rx;
+    /* === PHASE 2: Compute (all on device) === */
+    if (adi_cuda_diffuse_device_array(g_adi_cuda_ctx.d_u, Mx, My, hx, hy, d_coeff, tau) != 0) {
+        fprintf(stderr, "ERROR: CUDA kernel execution failed\n");
+        return 1;
     }
-    ax[0] = 0.0;
-    cx[0] = -2.0 * rx;
-    ax[Mx - 1] = -2.0 * rx;
-    cx[Mx - 1] = 0.0;
-    
-    /* Setup y-coefficients on CPU */
-    double *ay = (double*)malloc(My * sizeof(double));
-    double *by = (double*)malloc(My * sizeof(double));
-    double *cy = (double*)malloc(My * sizeof(double));
-    
-    for (int j = 0; j < My; j++) {
-        ay[j] = -ry;
-        by[j] = 1.0 + 2.0 * ry;
-        cy[j] = -ry;
-    }
-    ay[0] = 0.0;
-    cy[0] = -2.0 * ry;
-    ay[My - 1] = -2.0 * ry;
-    cy[My - 1] = 0.0;
-    
-    /* Copy coefficients to device */
-    cudaMemcpy(g_adi_cuda_ctx.d_ax, ax, Mx * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(g_adi_cuda_ctx.d_bx, bx, Mx * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(g_adi_cuda_ctx.d_cx, cx, Mx * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(g_adi_cuda_ctx.d_ay, ay, My * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(g_adi_cuda_ctx.d_by, by, My * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(g_adi_cuda_ctx.d_cy, cy, My * sizeof(double), cudaMemcpyHostToDevice);
-    
-    free(ax); free(bx); free(cx);
-    free(ay); free(by); free(cy);
-    
-    /* === PHASE 3: X-SWEEP === */
-    /* Compute RHS for x-sweep */
-    int block_size = 256;
-    int grid_size = (M + block_size - 1) / block_size;
-    compute_rhs_x<<<grid_size, block_size>>>(g_adi_cuda_ctx.d_u, g_adi_cuda_ctx.d_rhs, Mx, My, ry);
-    
-    /* Solve tridiagonal systems along x (row-wise) */
-    thomas_solve_batch_x<<<My, 1>>>(g_adi_cuda_ctx.d_ax, g_adi_cuda_ctx.d_bx, g_adi_cuda_ctx.d_cx,
-                                     g_adi_cuda_ctx.d_rhs, g_adi_cuda_ctx.d_u_star, Mx, My, Mx);
-    
     cudaEventRecord(g_adi_cuda_ctx.event_x_sweep, 0);
-    
-    /* === PHASE 4: Y-SWEEP === */
-    /* Compute RHS for y-sweep */
-    compute_rhs_y<<<grid_size, block_size>>>(g_adi_cuda_ctx.d_u_star, g_adi_cuda_ctx.d_rhs, Mx, My, rx);
-    
-    /* Solve tridiagonal systems along y (column-wise) */
-    int grid_y = (Mx + 32 - 1) / 32;
-    thomas_solve_batch_y<<<grid_y, 32>>>(g_adi_cuda_ctx.d_ay, g_adi_cuda_ctx.d_by, g_adi_cuda_ctx.d_cy,
-                                         g_adi_cuda_ctx.d_rhs, g_adi_cuda_ctx.d_u, My, Mx);
-    
     cudaEventRecord(g_adi_cuda_ctx.event_y_sweep, 0);
     
     /* === PHASE 5: Device to Host copy === */
@@ -479,6 +506,57 @@ int adi_cuda_step(double *u, int Mx, int My, double hx, double hy, double d_coef
     return 0;  /* Success */
 }
 
+int adi_cuda_step_triplet(double *u1, double d1,
+                          double *u2, double d2,
+                          double *u3, double d3,
+                          int Mx, int My, double hx, double hy, double tau) {
+    if (!u1 || !u2 || !u3 || Mx <= 0 || My <= 0) {
+        return 1;
+    }
+    if (!g_adi_cuda_initialized) {
+        if (adi_cuda_init(Mx, My) != 0) {
+            return 1;
+        }
+        adi_cuda_profiling_init(1000);
+    }
+    if (Mx != g_adi_cuda_ctx.Mx || My != g_adi_cuda_ctx.My) {
+        return 1;
+    }
+
+    const int M = Mx * My;
+    cudaError_t err;
+
+    err = cudaMemcpy(g_adi_cuda_ctx.d_u_batch[0], u1, M * sizeof(double), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) return 1;
+    err = cudaMemcpy(g_adi_cuda_ctx.d_u_batch[1], u2, M * sizeof(double), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) return 1;
+    err = cudaMemcpy(g_adi_cuda_ctx.d_u_batch[2], u3, M * sizeof(double), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) return 1;
+
+    if (adi_cuda_diffuse_device_array(g_adi_cuda_ctx.d_u_batch[0], Mx, My, hx, hy, d1, tau) != 0) return 1;
+    if (adi_cuda_diffuse_device_array(g_adi_cuda_ctx.d_u_batch[1], Mx, My, hx, hy, d2, tau) != 0) return 1;
+    if (adi_cuda_diffuse_device_array(g_adi_cuda_ctx.d_u_batch[2], Mx, My, hx, hy, d3, tau) != 0) return 1;
+
+    err = cudaMemcpy(u1, g_adi_cuda_ctx.d_u_batch[0], M * sizeof(double), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) return 1;
+    err = cudaMemcpy(u2, g_adi_cuda_ctx.d_u_batch[1], M * sizeof(double), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) return 1;
+    err = cudaMemcpy(u3, g_adi_cuda_ctx.d_u_batch[2], M * sizeof(double), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) return 1;
+
+    cudaDeviceSynchronize();
+
+    /* Keep compatibility with profiling parser by recording 3 synthetic steps. */
+    for (int k = 0; k < 3; k++) {
+        ADI_ProfileData prof = {0};
+        prof.step_number = g_adi_step_count++;
+        prof.grid_size = M;
+        prof.total_ms = 0.0f;
+        adi_cuda_profiling_record(prof);
+    }
+    return 0;
+}
+
 /* Cleanup hook - call this at program exit */
 __attribute__((destructor))
 static void adi_cuda_cleanup_atexit(void) {
@@ -487,4 +565,3 @@ static void adi_cuda_cleanup_atexit(void) {
         adi_cuda_cleanup();
     }
 }
-
