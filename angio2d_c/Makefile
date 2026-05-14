@@ -3,7 +3,7 @@ BUILDDIR = build
 PYTHON ?= python3
 BINDIR = bin
 
-SRCS = src/params.c src/grid.c src/taf.c src/operators.c src/reaction.c src/adi.c src/diagnostics.c src/output.c src/main.c
+SRCS = src/params.c src/grid.c src/taf.c src/operators.c src/reaction.c src/adi.c src/diagnostics.c src/output.c src/main.c src/adi_cuda_profiling.c
 OBJS = $(SRCS:src/%.c=$(BUILDDIR)/%.o)
 CUDA_SRCS = src/adi_cuda.cu
 CUDA_OBJS = $(CUDA_SRCS:src/%.cu=$(BUILDDIR)/%.o)
@@ -56,7 +56,6 @@ serial:
 	cp $(BUILDDIR)/angio2d $(BINDIR)/angio2d_serial
 
 openmp:
-	$(MAKE) clean
 	@mkdir -p $(BINDIR)
 	$(MAKE) USE_OPENMP=1 USE_CUDA=0 all
 	cp $(BUILDDIR)/angio2d $(BINDIR)/angio2d_openmp
@@ -65,7 +64,20 @@ check-cuda-env:
 	@command -v $(NVCC) >/dev/null 2>&1 || { echo "ERROR: nvcc not found"; exit 1; }
 
 cuda: check-cuda-env
-	$(MAKE) clean
 	@mkdir -p $(BINDIR) $(BUILDDIR)
 	$(MAKE) USE_OPENMP=1 USE_CUDA=1 $(BUILDDIR)/angio2d CUDA_NVCCFLAGS="$(CUDA_NVCCFLAGS)"
 	cp $(BUILDDIR)/angio2d $(BINDIR)/angio2d_cuda
+
+all-variants: clean
+	@mkdir -p $(BINDIR)
+	@echo "Building serial..."
+	$(MAKE) USE_OPENMP=0 USE_CUDA=0 $(BUILDDIR)/angio2d
+	cp $(BUILDDIR)/angio2d $(BINDIR)/angio2d_serial
+	@echo "Building OpenMP..."
+	$(MAKE) USE_OPENMP=1 USE_CUDA=0 $(BUILDDIR)/angio2d
+	cp $(BUILDDIR)/angio2d $(BINDIR)/angio2d_openmp
+	@echo "Building CUDA..."
+	$(MAKE) USE_OPENMP=1 USE_CUDA=1 $(BUILDDIR)/angio2d
+	cp $(BUILDDIR)/angio2d $(BINDIR)/angio2d_cuda
+	@echo "All variants built successfully!"
+	@ls -lh $(BINDIR)/

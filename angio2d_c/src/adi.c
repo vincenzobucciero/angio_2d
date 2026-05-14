@@ -1,6 +1,7 @@
 #include "adi.h"
 #ifdef USE_CUDA
 #include "adi_cuda.h"
+#include "adi_cuda_profiling.h"
 #endif
 #include <stdlib.h>
 #include <stdio.h>
@@ -111,16 +112,31 @@ void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau) 
 
 #ifdef USE_CUDA
     static int cuda_fallback_warned = 0;
+    static int cuda_used_logged = 0;
     const char *backend = getenv("ANGIO2D_BACKEND");
     if (backend && strcmp(backend, "cuda") == 0) {
+        if (!cuda_used_logged) {
+            fprintf(stdout, "[ADI] Attempting CUDA backend...\n");
+            fflush(stdout);
+            cuda_used_logged = 1;
+        }
         int cuda_rc = adi_cuda_step(u, Mx, My, p->hx, p->hy, d_coeff, tau);
         if (cuda_rc == 0) {
+            static int cuda_success_logged = 0;
+            if (!cuda_success_logged) {
+                fprintf(stdout, "[ADI] ✓ CUDA backend active and working\n");
+                fflush(stdout);
+                cuda_success_logged = 1;
+            }
             return;
         }
         if (!cuda_fallback_warned) {
-            fprintf(stderr, "WARN: CUDA ADI path unavailable (rc=%d), falling back to CPU ADI.\n", cuda_rc);
+            fprintf(stderr, "[ADI] WARN: CUDA ADI path unavailable (rc=%d), falling back to CPU ADI.\n", cuda_rc);
+            fflush(stderr);
             cuda_fallback_warned = 1;
         }
+    } else if (backend) {
+        fprintf(stderr, "[ADI] Unknown backend: %s (expected 'cuda')\n", backend);
     }
 #endif
 

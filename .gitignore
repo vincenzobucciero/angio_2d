@@ -1,5 +1,13 @@
 .venv/
 
+# Build artifacts
+angio2d_c/build/
+angio2d_c/bin/
+*.o
+*.out
+*.a
+*.so
+
 # Benchmark/runtime artifacts (keep repo clean)
 angio2d_c/output/*threads/
 angio2d_c/output/*/run-*/
@@ -10,4 +18,19 @@ angio2d_c/output/openmp_speedup_summary.csv
 angio2d_c/output/openmp_speedup_summary.md
 angio2d_c/output/presentation_openmp_summary.md
 
+# CUDA profiling raw data (keep only summary.md and timing.csv)
+results/cuda_profiling/run_*/output/csv/
+!results/cuda_profiling/run_*/output/csv/timing.csv
+results/cuda_profiling/run_*/output/*.txt
+
+# Test/debug logs
+profiling_*.log
+profiling_*.err
+
+# Editor/OS files
 .vscode/
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/

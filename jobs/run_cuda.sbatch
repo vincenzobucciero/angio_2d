@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=angio2d-cuda
-#SBATCH --partition=gpu
+#SBATCH --partition=low-gn
 #SBATCH --time=04:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_PATH="configs/run_profile.yaml"
-CUDA_MODULE="${CUDA_MODULE:-cuda}"
+CUDA_MODULE="${CUDA_MODULE:-nvidia/cuda-12.8.0}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

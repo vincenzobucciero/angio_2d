@@ -12,6 +12,7 @@
 #include <string.h>
 #include <math.h>		
 #include <sys/stat.h>		
+#include <time.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -176,6 +177,10 @@ int main(int argc, char *argv[]) {
     double tau = p->tau;		// Passo temporale completo
     double tau_half = tau / 2.0;		// Mezzo passo temporale
     
+    /* Timing for main loop */
+    struct timespec t_start, t_end;
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
+    
     for (int n = 0; n < p->Nsteps; n++) {		// Ciclo temporale principale
         reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Primo semi-passo di reazione
         reaction_clamp_positive(C, P, Inh, F, M);		// Impone non negatività
@@ -191,10 +196,23 @@ int main(int argc, char *argv[]) {
         diagnostics_record(diag, C, F, op, p, (n+1)*tau);		// Salva diagnostica al nuovo tempo
     }
     
+    clock_gettime(CLOCK_MONOTONIC, &t_end);
+    double total_solver_time = (t_end.tv_sec - t_start.tv_sec) + 
+                               (t_end.tv_nsec - t_start.tv_nsec) / 1.0e9;
+    
     diagnostics_print_summary(diag, p);		// Stampa riepilogo finale della simulazione
     diagnostics_save_csv(diag, p, "output/csv/diagnostics_c.csv");		// Salva diagnostica su CSV
     save_solution_to_csv(C, P, Inh, F, p, "output/csv/solution_c");		// Salva soluzione finale
     save_run_metadata(p, "output/csv/run_metadata.csv");		// Salva metadati dell'esecuzione
+    
+    /* Save timing information */
+    FILE *timing_file = fopen("output/csv/timing.csv", "w");
+    if (timing_file) {
+        fprintf(timing_file, "component,time_seconds\n");
+        fprintf(timing_file, "total_solver_time,%.6f\n", total_solver_time);
+        fclose(timing_file);
+        printf("Total solver time: %.6f seconds\n", total_solver_time);
+    }
     
     free(C);		// Libera C
     free(P);		// Libera P
