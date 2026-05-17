@@ -49,6 +49,7 @@ Contenuto minimo richiesto:
 ## Artefatti ufficiali già presenti
 
 - report campaign H100: `docs/h100_cuda_campaign_results.md`
+- tabella tempi ufficiale unica: `docs/official_gpu_times.csv`
 
 ## Regola per merge su main
 

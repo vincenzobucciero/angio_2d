@@ -36,21 +36,30 @@ Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione 
 - In caso di preemption/interruzioni, rilanciare il job con la stessa config per mantenere comparabilità.
 - Se una griglia fallisce in strict mode, il job si ferma intenzionalmente (no fallback CPU silenzioso).
 
-## Verifica GPU e tempi già misurati (2026-05-17, V100)
+## Confronti ufficiali (sintesi)
 
-Misure ottenute con strict mode attivo (`ANGIO2D_CUDA_STRICT=1`) e profiling dettagliato disattivato.
+### CPU vs OpenMP (baseline utente)
+| Grid | CPU serial t=1 median (s) | OpenMP best median (s) | Best speedup |
+|---|---:|---:|---:|
+| 64x64 | 0.645349 | 0.219299 | 2.9428x |
+| 128x128 | 16.142345 | 4.478649 | 3.6043x |
+| 256x256 | 319.976824 | 84.016191 | 3.8085x |
+| 512x512 | n.d. | n.d. | n.d. |
+| 1024x1024 | n.d. | n.d. | n.d. |
 
-| Grid | Esito | Tempo solver (s) | Backend effettivo | Fallback CPU |
-|---|---|---:|---|---|
-| 64x64 | OK | 0.574009 | cuda | no |
-| 256x256 | OK | 29.567179 | cuda | no |
-| 1024x1024 | OK | 6026.558008 | cuda | no |
+### CPU vs GPU CUDA (V100, strict mode)
+| Grid | CPU serial (s) | GPU CUDA (s) | GPU/CPU |
+|---|---:|---:|---:|
+| 64x64 | 0.645349 | 0.683379 | 1.06x |
+| 128x128 | 16.142345 | 3.618624 | 0.22x |
+| 256x256 | 319.976824 | 28.165658 | 0.09x |
+| 512x512 | n.d. | 227.842020 | n.d. |
+| 1024x1024 | n.d. | 6026.558008 | n.d. |
 
-Riferimenti sorgente:
-- `results/cuda_fix_minimal/64x64-1threads/run-001/csv/timing.csv`
-- `results/cuda_fix_minimal/256x256-1threads/run-001/csv/timing.csv`
-- `results/cuda_1024_single/1024x1024-1threads/run-001/csv/timing.csv`
-- `results/cuda_1024_single/1024x1024-1threads/run-001/log.txt`
+Nota:
+- Su `512` e `1024` il seriale non è stato completato.
+- Run CUDA validate con `effective_backend=cuda` e `fallback_cpu_detected=no`.
+- CSV ufficiale unico: `docs/official_gpu_times.csv`.
 
 ## Stato Diagnostico 1024 (2026-05-17)
 
