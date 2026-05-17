@@ -36,6 +36,22 @@ Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione 
 - In caso di preemption/interruzioni, rilanciare il job con la stessa config per mantenere comparabilità.
 - Se una griglia fallisce in strict mode, il job si ferma intenzionalmente (no fallback CPU silenzioso).
 
+## Verifica GPU e tempi già misurati (2026-05-17, V100)
+
+Misure ottenute con strict mode attivo (`ANGIO2D_CUDA_STRICT=1`) e profiling dettagliato disattivato.
+
+| Grid | Esito | Tempo solver (s) | Backend effettivo | Fallback CPU |
+|---|---|---:|---|---|
+| 64x64 | OK | 0.574009 | cuda | no |
+| 256x256 | OK | 29.567179 | cuda | no |
+| 1024x1024 | OK | 6026.558008 | cuda | no |
+
+Riferimenti sorgente:
+- `results/cuda_fix_minimal/64x64-1threads/run-001/csv/timing.csv`
+- `results/cuda_fix_minimal/256x256-1threads/run-001/csv/timing.csv`
+- `results/cuda_1024_single/1024x1024-1threads/run-001/csv/timing.csv`
+- `results/cuda_1024_single/1024x1024-1threads/run-001/log.txt`
+
 ## Stato Diagnostico 1024 (2026-05-17)
 
 - Job diagnostico: `951`
