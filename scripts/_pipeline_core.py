@@ -30,7 +30,7 @@ OUTPUT_ROOT = ANGIO2D_C / "output"
 OUTPUT_CSV_DIR = OUTPUT_ROOT / "csv"
 OUTPUT_FIG_DIR = OUTPUT_ROOT / "figures"
 DEFAULT_RESULTS_DIR = OUTPUT_ROOT
-GRID_TO_INDEX = {64: 0, 128: 1, 256: 2, 512: 3}
+GRID_TO_INDEX = {64: 0, 128: 1, 256: 2, 512: 3, 1024: 4}
 VALIDATION_FIELDS = ["diagnostics_c", "solution_c_C", "solution_c_P", "solution_c_Inh", "solution_c_F"]
 
 
@@ -48,15 +48,57 @@ def _load_yaml(path: Path) -> dict:
     if yaml is not None:
         with path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
+
+    def _parse_scalar(raw: str):
+        s = raw.strip()
+        if not s:
+            return ""
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            return s[1:-1]
+        low = s.lower()
+        if low == "true":
+            return True
+        if low == "false":
+            return False
+        try:
+            return int(s)
+        except ValueError:
+            pass
+        try:
+            return float(s)
+        except ValueError:
+            pass
+        return s
+
     text = path.read_text(encoding="utf-8")
-    lines = [line.split("#", 1)[0].rstrip() for line in text.splitlines()]
-    cleaned = "\n".join(line for line in lines if line.strip())
     data = {}
-    for line in cleaned.splitlines():
-        if ":" not in line:
+    current_list_key = None
+
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].rstrip()
+        if not line.strip():
             continue
-        k, v = line.split(":", 1)
-        data[k.strip()] = v.strip()
+
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+
+        if indent > 0 and stripped.startswith("-") and current_list_key is not None:
+            item = stripped[1:].strip()
+            data[current_list_key].append(_parse_scalar(item))
+            continue
+
+        current_list_key = None
+        if ":" not in stripped:
+            continue
+        k, v = stripped.split(":", 1)
+        key = k.strip()
+        val = v.strip()
+        if val == "":
+            data[key] = []
+            current_list_key = key
+        else:
+            data[key] = _parse_scalar(val)
+
     return data
 
 
@@ -103,8 +145,15 @@ def _compile_backend(backend: str) -> None:
     if backend == "serial":
         res = _run(["make", "serial"], ANGIO2D_C)
     elif backend == "openmp":
+        clean_res = _run(["make", "clean"], ANGIO2D_C)
+        if not clean_res.success:
+            raise RuntimeError(f"Clean before openmp failed: {clean_res.stderr[:240]}")
         res = _run(["make", "openmp"], ANGIO2D_C)
     elif backend == "cuda":
+        # Force a clean CUDA build to avoid stale objects compiled without USE_CUDA.
+        clean_res = _run(["make", "clean"], ANGIO2D_C)
+        if not clean_res.success:
+            raise RuntimeError(f"Clean before cuda failed: {clean_res.stderr[:240]}")
         res = _run(["make", "cuda"], ANGIO2D_C)
     else:
         raise ValueError(f"Unsupported backend: {backend}")
@@ -173,6 +222,15 @@ def _run_solver(grid: int, backend: str, threads: Optional[int], timeout_s: int)
         str(GRID_TO_INDEX[grid]),
     ]
     return _run(cmd, ANGIO2D_C, env=env, timeout_s=timeout_s)
+
+
+def _set_cuda_runtime_env(backend: str, cuda_profile_detailed: bool) -> None:
+    if backend != "cuda":
+        return
+    # Strict by default in benchmark flow: fail fast instead of silent CPU fallback.
+    os.environ["ANGIO2D_CUDA_STRICT"] = os.environ.get("ANGIO2D_CUDA_STRICT", "1")
+    # Detailed CUDA profiling is opt-in to minimize timestep overhead.
+    os.environ["ANGIO2D_CUDA_PROFILE"] = "1" if cuda_profile_detailed else "0"
 
 
 def _generate_plots() -> RunResult:
@@ -366,8 +424,10 @@ def _single_run(
     generate_plots: bool,
     output_dir: Path,
     timeout_s: int,
+    cuda_profile_detailed: bool = False,
 ) -> int:
     run_dir = _prepare_run_dir(output_dir, grid, threads, run_id=None)
+    _set_cuda_runtime_env(backend, cuda_profile_detailed)
     _compile_backend(backend)
     result = _run_solver(grid, backend, threads if backend in {"openmp", "cuda"} else None, timeout_s)
 
@@ -425,15 +485,22 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
     generate_plots = bool(config.get("generate_plots", True))
     timeout_s = int(config.get("timeout_per_run", 600))
     continue_on_failure = bool(config.get("continue_on_failure", True))
+    cuda_profile_detailed = bool(config.get("cuda_profile_detailed", False))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     failures = 0
+    timing_rows: List[dict] = []
+    validation_rows: List[dict] = []
+
+    # Compile once per backend/profile to avoid repeated CPU-only compile overhead
+    # inside each run loop (especially expensive for CUDA campaigns).
+    _set_cuda_runtime_env(backend, cuda_profile_detailed)
+    _compile_backend(backend)
 
     for grid in grid_sizes:
         for thread in threads:
             for run_id in range(1, runs + 1):
                 run_dir = _prepare_run_dir(output_dir, grid, thread, run_id=run_id)
-                _compile_backend(backend)
                 run_res = _run_solver(grid, backend, thread if backend in {"openmp", "cuda"} else None, timeout_s)
 
                 lines = [
@@ -451,6 +518,16 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
                     "stderr:",
                     run_res.stderr,
                 ]
+                timing_rows.append(
+                    {
+                        "grid": f"{grid}x{grid}",
+                        "threads": thread,
+                        "run": run_id,
+                        "success": run_res.success,
+                        "elapsed_s": f"{run_res.elapsed_s:.6f}",
+                        "reason": run_res.reason,
+                    }
+                )
 
                 if run_res.success:
                     if backend == "cuda":
@@ -462,14 +539,21 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
                     lines.append("")
                     lines.append(_persist_outputs(run_dir, generate_plots))
                     if validate:
-                        lines.append(
-                            _run_validation_for_current_output(
-                                grid,
-                                backend,
-                                thread if backend in {"openmp", "cuda"} else None,
-                                timeout_s,
-                                run_dir,
-                            )
+                        validation_text = _run_validation_for_current_output(
+                            grid,
+                            backend,
+                            thread if backend in {"openmp", "cuda"} else None,
+                            timeout_s,
+                            run_dir,
+                        )
+                        lines.append(validation_text)
+                        validation_rows.append(
+                            {
+                                "grid": f"{grid}x{grid}",
+                                "threads": thread,
+                                "run": run_id,
+                                "summary": validation_text,
+                            }
                         )
                         _persist_outputs(run_dir, generate_plots)
                 else:
@@ -482,6 +566,28 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
                 _write_log(run_dir / "log.txt", "\n".join(lines))
 
     _build_speedup_summary(output_dir=output_dir, grids=grid_sizes, threads=threads, backend=backend)
+    timing_out = output_dir / "timing.csv"
+    with timing_out.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["grid", "threads", "run", "success", "elapsed_s", "reason"])
+        writer.writeheader()
+        writer.writerows(timing_rows)
+    speedup_src = output_dir / f"{backend}_speedup_summary.md"
+    speedup_dst = output_dir / "speedup_summary.md"
+    if speedup_src.exists():
+        shutil.copy2(speedup_src, speedup_dst)
+    validation_out = output_dir / "validation_summary.md"
+    with validation_out.open("w", encoding="utf-8") as f:
+        f.write("# Validation Summary\n\n")
+        if not validate:
+            f.write("Validation disabled.\n")
+        elif not validation_rows:
+            f.write("No validation data collected.\n")
+        else:
+            for row in validation_rows:
+                f.write(f"## {row['grid']} t={row['threads']} run={row['run']}\n")
+                f.write("```\n")
+                f.write(f"{row['summary']}\n")
+                f.write("```\n\n")
     return 0 if failures == 0 else 2
 
 

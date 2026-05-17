@@ -1,0 +1,14 @@
+backend: cuda
+
+grid_sizes:
+  - 1024
+
+threads:
+  - 1
+
+runs: 1
+validate_against_serial: false
+generate_plots: false
+continue_on_failure: false
+output_root: results/cuda_1024_single
+timeout_per_run: 604800

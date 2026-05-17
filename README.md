@@ -1,86 +1,117 @@
 # ANGIO2D
 
-Progetto per simulazioni 2D di angiogenesi con tre backend eseguibili:
+Guida ufficiale unica post-clone per esecuzioni `serial`, `openmp`, `cuda`.
 
-- `serial`
-- `openmp`
-- `cuda`
+## Prerequisiti
+- Linux + `make`
+- compilatore C (`gcc` o `clang`)
+- Python `3.11+`
+- dipendenze Python: `numpy`, `matplotlib`, `pillow`
+- per CUDA: `nvcc` + GPU NVIDIA compatibile
 
-Obiettivo utente: lanciare simulazioni e ottenere sempre gli stessi artefatti:
-
-- output numerici `csv`
-- 4 figure finali
-- `log.txt` run
-
-## Struttura (chiara e unica)
-
-- `scripts/`: comandi utente (CLI)
-- `configs/`: profili YAML
-- `jobs/`: wrapper SLURM
-- `angio2d_c/`: solver C/OpenMP/CUDA
-- `angio2d_c/output/`: unica root risultati
-
-## Comandi principali
-
-### Run singola da terminale
+Setup rapido:
 
 ```bash
-python3 scripts/run_simulation.py --backend serial --grid 128
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r angio2d_c/requirements.txt
+```
+
+## Entry point ufficiali
+- Run singolo: `scripts/run_simulation.py`
+- Batch da YAML: `scripts/run_batch.py`
+- SLURM OpenMP: `jobs/run_openmp.sbatch`
+- SLURM CUDA: `jobs/run_cuda.sbatch`
+- SLURM CUDA H100 campaign: `jobs/run_cuda_h100_campaign.sbatch`
+
+Interfacce legacy/deprecate (wrapper benchmark storici e job `*_benchmark.sbatch`) non sono supportate.
+
+## Griglie supportate
+`64, 128, 256, 512, 1024`
+
+## YAML canonici
+| YAML | Scopo | Comando | Backend | Output |
+|---|---|---|---|---|
+| `configs/run_profile.yaml` | Profilo standard locale | `python3 scripts/run_batch.py --config configs/run_profile.yaml --backend <serial\|openmp\|cuda>` | serial/openmp/cuda | `angio2d_c/output/` |
+| `configs/single_grid_debug.yaml` | Debug rapido singola griglia | `python3 scripts/run_batch.py --config configs/single_grid_debug.yaml --backend <openmp\|cuda\|serial>` | openmp (default) | `angio2d_c/output/` |
+| `configs/h100_cuda_campaign.yaml` | Campagna H100 (5 run per griglia) | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_campaign.yaml` | cuda | `results/h100_cuda_campaign/` |
+| `configs/h100_cuda_onepass_1024first.yaml` | One-pass CUDA (ordine 1024→64) | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_onepass_1024first.yaml` | cuda | `results/h100_cuda_onepass_1024first/` |
+| `configs/h100_cuda_diag_1024.yaml` | Diagnostica solo 1024 | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_diag_1024.yaml` | cuda | `results/h100_cuda_onepass_1024first/diagnostics/` |
+| `configs/cuda_fix_minimal_benchmark.yaml` | Benchmark fix minimo (64/256/1024) | `python3 scripts/run_batch.py --config configs/cuda_fix_minimal_benchmark.yaml --backend cuda` | cuda | `results/cuda_fix_minimal/` |
+| `configs/cuda_1024_single.yaml` | Test singolo 1024 CUDA | `python3 scripts/run_batch.py --config configs/cuda_1024_single.yaml --backend cuda` | cuda | `results/cuda_1024_single/` |
+
+## Quickstart
+### Run singolo
+```bash
+python3 scripts/run_simulation.py --backend serial --grid 128 --threads 1
 python3 scripts/run_simulation.py --backend openmp --grid 128 --threads 4
 python3 scripts/run_simulation.py --backend cuda --grid 128 --threads 1
 ```
 
-### Run batch locale da config
+Nota: `run_simulation.py` genera figure di default. Per disabilitarle: `--no-generate-plots`.
 
+### Batch locale
 ```bash
-python3 scripts/run_batch.py --config configs/run_profile.yaml
+python3 scripts/run_batch.py --config configs/run_profile.yaml --backend openmp
+python3 scripts/run_batch.py --config configs/run_profile.yaml --backend cuda
 ```
 
-### Run batch su cluster (SLURM)
-
+### Batch SLURM
 ```bash
 sbatch jobs/run_openmp.sbatch --config configs/run_profile.yaml
 sbatch jobs/run_cuda.sbatch --config configs/run_profile.yaml
 ```
 
-Nota: per OpenMP/CUDA su HPC devi usare partizione/risorse corrette del tuo cluster.
+### H100 CUDA campaign
+```bash
+sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_campaign.yaml
+```
 
-## Config utente
+## Dove trovare risultati
+### Output standard
+Root: `angio2d_c/output/`
 
-File: `configs/run_profile.yaml`
+Per run:
+`<grid>x<grid>-<threads>threads/run-XXX/`
 
-Campi principali:
-
-- `backend`
-- `grid_sizes`
-- `threads`
-- `runs`
-- `validate`
-- `generate_plots`
-- `output_root`
-- `timeout_per_run`
-- `continue_on_failure`
-
-Precedenza: `CLI override > YAML > default`.
-
-## Output
-
-Per ogni configurazione:
-
-`angio2d_c/output/<grid>x<grid>-<threads>threads[/run-XXX]/`
-
-con:
-
-- `csv/`
-- `figures/`
+Contenuto:
+- `csv/` (diagnostica, campi finali, metadata, timing)
+- `figures/` (4 immagini finali, se plotting attivo)
 - `log.txt`
 
-## Compatibilità legacy
+Per batch:
+- `timing.csv` (aggregato run-level)
+- `speedup_summary.md` (sintesi leggibile)
+- `validation_summary.md` (se validazione attiva)
 
-Alcuni script/job con nome `*benchmark*` restano solo come wrapper deprecati temporanei.
-Interfaccia consigliata: `run_simulation.py`, `run_batch.py`, `run_openmp.sbatch`, `run_cuda.sbatch`.
+### Output H100 campaign
+Root: `results/h100_cuda_campaign/`
 
-## Documentazione
+Contenuto:
+- `cuda_speedup_summary.csv`
+- `cuda_speedup_summary.md`
+- `cuda_env_report.json`
+- `slurm_<JOBID>.out`, `slurm_<JOBID>.err`
 
-- [docs/phase2_openmp_results.md](/home/ccoppola/projects/angio_2d/docs/phase2_openmp_results.md)
-- [docs/phase3_cuda_acceleration.md](/home/ccoppola/projects/angio_2d/docs/phase3_cuda_acceleration.md)
+## Regole operative CUDA (anti-ambiguità)
+- Profiling CUDA dettagliato: OFF di default (`ANGIO2D_CUDA_PROFILE=0`)
+- Per abilitarlo: `--cuda-profile-detailed` (CLI) o `ANGIO2D_CUDA_PROFILE=1`
+- Strict mode CUDA: ON di default nei benchmark (`ANGIO2D_CUDA_STRICT=1`)
+- Se CUDA fallisce in strict mode: run abortisce (no fallback silenzioso CPU)
+
+## Documentazione risultati
+- contratto artefatti ufficiali: `docs/results_official.md`
+- stato/report campagna H100: `docs/h100_cuda_campaign_results.md`
+
+## Repository hygiene
+Non versionare transienti:
+- `slurm-*.out`, `slurm-*.err`
+- log temporanei profiling
+- output intermedi raw non richiesti
+
+Check rapido:
+```bash
+git ls-files | rg "(run_pipeline|benchmark_from_config|run_.*benchmark\\.sbatch|slurm-|profiling_|results/cuda_profiling/)"
+```
+
+Deve restituire vuoto.

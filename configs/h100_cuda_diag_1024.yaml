@@ -1,0 +1,17 @@
+backend: cuda
+
+grid_sizes:
+  - 1024
+
+threads:
+  - 1
+
+runs: 1
+
+validate_against_serial: false
+generate_plots: false
+
+output_root: results/h100_cuda_onepass_1024first/diagnostics
+
+timeout_per_run: 604800
+continue_on_failure: false

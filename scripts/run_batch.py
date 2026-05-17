@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=str, help="Output root override")
     parser.add_argument("--timeout-per-run", type=int, help="Timeout override")
     parser.add_argument("--continue-on-failure", action="store_true", help="Continue if one run fails")
+    parser.add_argument("--cuda-profile-detailed", action="store_true", help="Enable detailed CUDA profiling")
     return parser.parse_args()
 
 
@@ -50,6 +51,8 @@ def main() -> int:
         config["timeout_per_run"] = args.timeout_per_run
     if args.continue_on_failure:
         config["continue_on_failure"] = True
+    if args.cuda_profile_detailed:
+        config["cuda_profile_detailed"] = True
 
     outdir = resolve_output_root(config, output_override=args.output_root)
     return run_benchmark_from_profile(config=config, output_dir=outdir)

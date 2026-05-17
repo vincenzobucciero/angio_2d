@@ -1,12 +1,10 @@
-backend: cuda
+backend: openmp
 
 grid_sizes:
-  - 64
   - 128
-  - 256
 
 threads:
-  - 1
+  - 4
 
 runs: 1
 
@@ -15,5 +13,5 @@ generate_plots: true
 
 output_root: angio2d_c/output
 
-timeout_per_run: 1200
-continue_on_failure: true
+timeout_per_run: 3600
+continue_on_failure: false

@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CONFIG_PATH="configs/run_profile.yaml"
 CUDA_MODULE="${CUDA_MODULE:-nvidia/cuda-12.8.0}"
 
@@ -43,11 +43,10 @@ export OMP_PLACES="${OMP_PLACES:-cores}"
 export OMP_DYNAMIC="${OMP_DYNAMIC:-FALSE}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+export ANGIO2D_CUDA_STRICT="${ANGIO2D_CUDA_STRICT:-1}"
+export ANGIO2D_CUDA_PROFILE="${ANGIO2D_CUDA_PROFILE:-0}"
 
-PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
-if [[ ! -x "${PYTHON_BIN}" ]]; then
-  PYTHON_BIN="$(command -v python3)"
-fi
+PYTHON_BIN="${ANGIO2D_PYTHON:-/usr/bin/python3.11}"
 
 cd "${ROOT_DIR}"
 "${PYTHON_BIN}" scripts/check_cuda_env.py --output angio2d_c/output/_meta/cuda_env_report.json || true

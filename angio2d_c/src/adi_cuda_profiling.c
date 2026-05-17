@@ -1,4 +1,5 @@
 #include "adi_cuda_profiling.h"
+#include <string.h>
 
 /* Make symbols visible to C++ code */
 #ifdef __cplusplus
@@ -9,8 +10,18 @@ ADI_ProfileData *g_adi_profile_data = NULL;
 int g_adi_profile_count = 0;
 int g_adi_profile_max = 0;
 FILE *g_adi_profile_file = NULL;
+static int g_adi_profile_enabled = 0;
 
 void adi_cuda_profiling_init(int max_steps) {
+    const char *env = getenv("ANGIO2D_CUDA_PROFILE");
+    g_adi_profile_enabled = (env && strcmp(env, "1") == 0) ? 1 : 0;
+    if (!g_adi_profile_enabled) {
+        g_adi_profile_max = 0;
+        g_adi_profile_count = 0;
+        g_adi_profile_file = NULL;
+        return;
+    }
+
     g_adi_profile_max = max_steps * 3;  /* 3 fields (C, P, Inh) per step */
     g_adi_profile_data = (ADI_ProfileData*)malloc(g_adi_profile_max * sizeof(ADI_ProfileData));
     g_adi_profile_count = 0;
@@ -21,11 +32,14 @@ void adi_cuda_profiling_init(int max_steps) {
         fprintf(g_adi_profile_file, "ADI CUDA Profiling Log\n");
         fprintf(g_adi_profile_file, "======================\n\n");
         fprintf(g_adi_profile_file, "step,grid_size,h2d_copy_ms,x_sweep_ms,y_sweep_ms,d2h_copy_ms,sync_ms,total_ms\n");
-        fflush(g_adi_profile_file);
+        /* Keep buffered writes: no per-step flush in benchmark path. */
+    } else {
+        fprintf(stderr, "[CUDA PROFILING] WARN: cannot open output/cuda_profiling_log.txt for writing\n");
     }
 }
 
 void adi_cuda_profiling_record(ADI_ProfileData data) {
+    if (!g_adi_profile_enabled) return;
     if (g_adi_profile_count < g_adi_profile_max) {
         g_adi_profile_data[g_adi_profile_count] = data;
         g_adi_profile_count++;
@@ -40,12 +54,12 @@ void adi_cuda_profiling_record(ADI_ProfileData data) {
                     data.d2h_copy_ms,
                     data.sync_time_ms,
                     data.total_ms);
-            fflush(g_adi_profile_file);
         }
     }
 }
 
 void adi_cuda_profiling_finalize(void) {
+    if (!g_adi_profile_enabled) return;
     if (g_adi_profile_file) {
         fprintf(g_adi_profile_file, "\n\nSummary Statistics\n");
         fprintf(g_adi_profile_file, "===================\n");

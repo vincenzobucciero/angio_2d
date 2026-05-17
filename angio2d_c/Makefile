@@ -9,7 +9,7 @@ CUDA_SRCS = src/adi_cuda.cu
 CUDA_OBJS = $(CUDA_SRCS:src/%.cu=$(BUILDDIR)/%.o)
 ALL_OBJS = $(OBJS) $(if $(filter 1,$(USE_CUDA)),$(CUDA_OBJS),)
 
-.PHONY: all clean run figures compare pipeline check-env check-python serial openmp cuda check-cuda-env
+.PHONY: all clean run figures compare check-env check-python serial openmp cuda check-cuda-env
 
 all: $(BUILDDIR)/angio2d
 
@@ -45,9 +45,6 @@ compare: check-python
 	$(PYTHON) scripts/compare_diagnostics.py
 	$(PYTHON) scripts/compare_fields.py
 	$(PYTHON) scripts/compare_with_matlab.py
-
-pipeline: check-python
-	$(PYTHON) scripts/run_pipeline.py
 
 serial:
 	$(MAKE) clean
