@@ -35,10 +35,6 @@ Interfacce legacy/deprecate (wrapper benchmark storici e job `*_benchmark.sbatch
 | `configs/run_profile.yaml` | Profilo standard locale | `python3 scripts/run_batch.py --config configs/run_profile.yaml --backend <serial\|openmp\|cuda>` | serial/openmp/cuda | `angio2d_c/output/` |
 | `configs/single_grid_debug.yaml` | Debug rapido singola griglia | `python3 scripts/run_batch.py --config configs/single_grid_debug.yaml --backend <openmp\|cuda\|serial>` | openmp (default) | `angio2d_c/output/` |
 | `configs/h100_cuda_campaign.yaml` | Campagna H100 (5 run per griglia) | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_campaign.yaml` | cuda | `results/h100_cuda_campaign/` |
-| `configs/h100_cuda_onepass_1024first.yaml` | One-pass CUDA (ordine 1024→64) | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_onepass_1024first.yaml` | cuda | `results/h100_cuda_onepass_1024first/` |
-| `configs/h100_cuda_diag_1024.yaml` | Diagnostica solo 1024 | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_diag_1024.yaml` | cuda | `results/h100_cuda_onepass_1024first/diagnostics/` |
-| `configs/cuda_fix_minimal_benchmark.yaml` | Benchmark fix minimo (64/256/1024) | `python3 scripts/run_batch.py --config configs/cuda_fix_minimal_benchmark.yaml --backend cuda` | cuda | `results/cuda_fix_minimal/` |
-| `configs/cuda_1024_single.yaml` | Test singolo 1024 CUDA | `python3 scripts/run_batch.py --config configs/cuda_1024_single.yaml --backend cuda` | cuda | `results/cuda_1024_single/` |
 
 ## Quickstart
 ### Run singolo

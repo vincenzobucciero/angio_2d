@@ -61,10 +61,8 @@ Nota:
 - Run CUDA validate con `effective_backend=cuda` e `fallback_cpu_detected=no`.
 - CSV ufficiale unico: `docs/official_gpu_times.csv`.
 
-## Stato Diagnostico 1024 (2026-05-17)
+## Stato Diagnostico 1024 (storico)
 
-- Job diagnostico: `951`
-- Esito: `FAILED` intenzionale via guard-rail (`ExitCode=99`)
-- Evidenza: GPU idle per 60s (`util=0%`, `power~89W`) durante run `1024x1024`
-- Azione: benchmark one-pass completo bloccato finché non viene risolta la causa sul path CUDA `1024`.
-- Riferimento log: `results/h100_cuda_onepass_1024first/diagnostics/slurm_diag_951.out`
+- In una fase precedente il run `1024` falliva e attivava strict mode.
+- La causa era nel kernel CUDA ADI (buffer Thomas dimensionati in modo fisso).
+- Stato attuale: fix applicato, run `1024` completato su GPU (`6026.558008 s`).
