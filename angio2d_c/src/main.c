@@ -7,11 +7,16 @@
 #include "adi.h"		
 #include "diagnostics.h"		
 #include "output.h"		
+#ifdef USE_CUDA
+#include "adi_cuda.h"
+#endif
 #include <stdlib.h>		
 #include <stdio.h>		
 #include <string.h>
+#include <errno.h>
 #include <math.h>		
 #include <sys/stat.h>		
+#include <time.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -175,26 +180,186 @@ int main(int argc, char *argv[]) {
     
     double tau = p->tau;		// Passo temporale completo
     double tau_half = tau / 2.0;		// Mezzo passo temporale
+    int diag_stride = 1;
+    const char *diag_stride_env = getenv("ANGIO2D_DIAG_STRIDE");
+    if (diag_stride_env && *diag_stride_env) {
+        char *endptr = NULL;
+        long parsed = strtol(diag_stride_env, &endptr, 10);
+        if (endptr != diag_stride_env && parsed > 0 && parsed <= 100000000L) {
+            diag_stride = (int)parsed;
+        } else {
+            fprintf(stderr, "[DIAG] WARN: invalid ANGIO2D_DIAG_STRIDE='%s', using 1\n", diag_stride_env);
+        }
+    }
+#ifdef USE_CUDA
+    const char *backend = getenv("ANGIO2D_BACKEND");
+    int use_cuda_backend = (backend && strcmp(backend, "cuda") == 0);
+    int requested_cuda_backend = use_cuda_backend;
+    const char *cuda_strict_env = getenv("ANGIO2D_CUDA_STRICT");
+    /* Strict mode prevents silent CPU fallback when CUDA was explicitly requested. */
+    int cuda_strict = (cuda_strict_env && strcmp(cuda_strict_env, "1") == 0);
+    int fallback_to_cpu_happened = 0;
+    int cuda_device_id = -1;
+    int cuda_session_active = 0;
+    char cuda_device_name[256];
+    cuda_device_name[0] = '\0';
+    if (use_cuda_backend && !diag_stride_env) {
+        /* CUDA benchmark default: throttle expensive diagnostics copies/computation. */
+        diag_stride = 256;
+    }
+    if (use_cuda_backend) {
+        if (adi_cuda_session_init(C, P, Inh, F, taf, p) != 0) {
+            if (cuda_strict) {
+                /* Print a one-shot run banner even on early strict abort for post-mortem logs. */
+                fprintf(stdout,
+                        "[RUN MODE] requested_backend=%s effective_backend=%s cuda_device_id=%d cuda_gpu=\"%s\" adi_cuda_active=%s reaction_cpu=%s diagnostics_cpu=%s\n",
+                        requested_cuda_backend ? "cuda" : "cpu",
+                        "cpu",
+                        -1,
+                        "n/a",
+                        "no",
+                        "yes",
+                        "yes");
+                fflush(stdout);
+                fprintf(stderr, "[CUDA] ERROR: session init failed and CUDA_STRICT=1, aborting run.\n");
+                reaction_workspace_free(rws);
+                free(C);
+                free(P);
+                free(Inh);
+                free(F);
+                diagnostics_free(diag);
+                adi_free(adi);
+                operators_free(op);
+                taf_free(taf);
+                grid_free(g);
+                params_free(p);
+                return 2;
+            } else {
+                fprintf(stderr, "[CUDA] WARN: session init failed, fallback CPU path\n");
+                use_cuda_backend = 0;
+                fallback_to_cpu_happened = 1;
+            }
+        }
+        if (use_cuda_backend) {
+            (void)adi_cuda_get_device_info(&cuda_device_id, cuda_device_name, (int)sizeof(cuda_device_name), &cuda_session_active);
+        }
+    }
+    /* One-shot execution mode banner used by benchmark logs and diagnostics tooling. */
+    fprintf(stdout,
+            "[RUN MODE] requested_backend=%s effective_backend=%s cuda_device_id=%d cuda_gpu=\"%s\" adi_cuda_active=%s reaction_cpu=%s diagnostics_cpu=%s\n",
+            requested_cuda_backend ? "cuda" : "cpu",
+            use_cuda_backend ? "cuda" : "cpu",
+            cuda_device_id,
+            (cuda_device_name[0] != '\0') ? cuda_device_name : "n/a",
+            use_cuda_backend ? "yes" : "no",
+            "yes",
+            "yes");
+#endif
+    fprintf(stdout, "[DIAG] record stride = %d\n", diag_stride);
+    fflush(stdout);
+    
+    /* Timing for main loop */
+    struct timespec t_start, t_end;
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
     
     for (int n = 0; n < p->Nsteps; n++) {		// Ciclo temporale principale
+        #ifdef USE_CUDA
+        if (use_cuda_backend) {
+            int cuda_rc = adi_cuda_session_step(p, tau, tau_half);
+            if (cuda_rc != 0) {
+                static int cuda_step_fallback_warned = 0;
+                if (!cuda_step_fallback_warned) {
+                    fprintf(stderr, "[CUDA] WARN: session step failed (rc=%d), switching to CPU fallback path.\n", cuda_rc);
+                    cuda_step_fallback_warned = 1;
+                }
+                if (cuda_strict) {
+                    fprintf(stderr, "[CUDA] ERROR: CUDA_STRICT=1, aborting on first session step failure.\n");
+                    adi_cuda_session_finalize();
+                    reaction_workspace_free(rws);
+                    free(C);
+                    free(P);
+                    free(Inh);
+                    free(F);
+                    diagnostics_free(diag);
+                    adi_free(adi);
+                    operators_free(op);
+                    taf_free(taf);
+                    grid_free(g);
+                    params_free(p);
+                    return 3;
+                } else {
+                    use_cuda_backend = 0;
+                    fallback_to_cpu_happened = 1;
+                }
+            }
+            if (!use_cuda_backend) {
+                reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);
+                reaction_clamp_positive(C, P, Inh, F, M);
+                adi_step(C, p, adi, p->dC, tau);		// Fallback Diffusione di C
+                adi_step(P, p, adi, p->dP, tau);		// Fallback Diffusione di P
+                adi_step(Inh, p, adi, p->dI, tau);		// Fallback Diffusione di Inh
+                reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);
+                reaction_clamp_positive(C, P, Inh, F, M);
+            }
+        } else {
+            reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Primo semi-passo di reazione
+            reaction_clamp_positive(C, P, Inh, F, M);		// Impone non negatività
+            adi_step(C, p, adi, p->dC, tau);		// Diffusione di C
+            adi_step(P, p, adi, p->dP, tau);		// Diffusione di P
+            adi_step(Inh, p, adi, p->dI, tau);		// Diffusione di Inh
+            reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Secondo semi-passo di reazione
+            reaction_clamp_positive(C, P, Inh, F, M);		// Impone nuovamente non negatività
+        }
+        #else
         reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Primo semi-passo di reazione
         reaction_clamp_positive(C, P, Inh, F, M);		// Impone non negatività
-        
         adi_step(C, p, adi, p->dC, tau);		// Diffusione di C
         adi_step(P, p, adi, p->dP, tau);		// Diffusione di P
         adi_step(Inh, p, adi, p->dI, tau);		// Diffusione di Inh
-        // F non diffonde		// La variabile F non ha termine diffusivo
-        
         reaction_step_with_workspace(C, P, Inh, F, taf, op, p, tau_half, rws);		// Secondo semi-passo di reazione
         reaction_clamp_positive(C, P, Inh, F, M);		// Impone nuovamente non negatività
-        
-        diagnostics_record(diag, C, F, op, p, (n+1)*tau);		// Salva diagnostica al nuovo tempo
+        #endif
+
+        if (((n + 1) % diag_stride) == 0 || (n == p->Nsteps - 1)) {
+            #ifdef USE_CUDA
+            if (use_cuda_backend) {
+                if (adi_cuda_session_copy_cf(C, F) != 0) {
+                    fprintf(stderr, "[CUDA] WARN: copy C/F failed at step %d\n", n);
+                }
+            }
+            #endif
+            diagnostics_record(diag, C, F, op, p, (n+1)*tau);		// Salva diagnostica al nuovo tempo
+        }
     }
     
+    clock_gettime(CLOCK_MONOTONIC, &t_end);
+    double total_solver_time = (t_end.tv_sec - t_start.tv_sec) + 
+                               (t_end.tv_nsec - t_start.tv_nsec) / 1.0e9;
+    
     diagnostics_print_summary(diag, p);		// Stampa riepilogo finale della simulazione
+#ifdef USE_CUDA
+    if (use_cuda_backend) {
+        (void)adi_cuda_session_copy_all(C, P, Inh, F);
+        adi_cuda_session_finalize();
+    }
+    if (requested_cuda_backend && fallback_to_cpu_happened) {
+        fprintf(stdout, "[CUDA] fallback_cpu_detected=yes\n");
+    } else if (requested_cuda_backend) {
+        fprintf(stdout, "[CUDA] fallback_cpu_detected=no\n");
+    }
+#endif
     diagnostics_save_csv(diag, p, "output/csv/diagnostics_c.csv");		// Salva diagnostica su CSV
     save_solution_to_csv(C, P, Inh, F, p, "output/csv/solution_c");		// Salva soluzione finale
     save_run_metadata(p, "output/csv/run_metadata.csv");		// Salva metadati dell'esecuzione
+    
+    /* Save timing information */
+    FILE *timing_file = fopen("output/csv/timing.csv", "w");
+    if (timing_file) {
+        fprintf(timing_file, "component,time_seconds\n");
+        fprintf(timing_file, "total_solver_time,%.6f\n", total_solver_time);
+        fclose(timing_file);
+        printf("Total solver time: %.6f seconds\n", total_solver_time);
+    }
     
     free(C);		// Libera C
     free(P);		// Libera P

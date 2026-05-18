@@ -1,168 +1,113 @@
-# angio_2d
+# ANGIO2D
 
-Implementazione MATLAB di un modello bidimensionale di angiogenesi tumorale basato su splitting operatoriale e schema ADI.
+Guida ufficiale unica post-clone per esecuzioni `serial`, `openmp`, `cuda`.
 
-## Problema modellato
+## Prerequisiti
+- Linux + `make`
+- compilatore C (`gcc` o `clang`)
+- Python `3.11+`
+- dipendenze Python: `numpy`, `matplotlib`, `pillow`
+- per CUDA: `nvcc` + GPU NVIDIA compatibile
 
-Il progetto descrive l'evoluzione nel piano di quattro campi accoppiati:
-
-- `C(x,y,t)`: densita di cellule endoteliali
-- `P(x,y,t)`: concentrazione di proteasi
-- `Inh(x,y,t)`: concentrazione di inibitore angiogenico
-- `F(x,y,t)`: densita di matrice extracellulare (ECM)
-
-Il sistema segue l'idea del paper allegato nel PDF: la crescita dei vasi tumorali viene modellata come interazione tra diffusione, chemotassi, haptotassi, proliferazione cellulare e degradazione della matrice extracellulare. La sorgente angiogenica tumorale, indicata come TAF, viene prescritta come un campo stazionario con massimo vicino al bordo destro del dominio, così da guidare il moto delle cellule verso la zona tumorale.
-
-Dal punto di vista numerico il problema viene risolto su un dominio rettangolare con condizioni di Neumann omogenee. La dinamica in tempo è separata in due parti: un passo di reazione/trasporto trattato esplicitamente e un passo diffusivo trattato con ADI di Peaceman-Rachford, in modo da trasformare il problema 2D in una sequenza di sistemi tridiagonali 1D.
-
-## File MATLAB
-
-### `angio2d_ADI/default_params.m`
-
-Definisce tutti i parametri del modello e della discretizzazione. In particolare:
-
-- imposta dominio, griglia e tempo finale
-- assegna i coefficienti di diffusione e le costanti cinetiche
-- definisce i parametri della chemotassi, haptotassi e del TAF
-- imposta le condizioni iniziali
-- calcola automaticamente il passo temporale `tau` a partire da una stima CFL e determina il numero di passi `Nsteps`
-
-Questo file non esegue la simulazione: prepara solo la struttura `p` che contiene i parametri necessari a tutto il resto.
-
-### `angio2d_ADI/angio2d_core.m`
-
-Esegue il calcolo numerico vero e proprio. Il file:
-
-- costruisce la griglia 2D uniforme
-- costruisce gli operatori discreti 1D di derivata e Laplaciano
-- estende questi operatori al caso 2D tramite prodotti di Kronecker
-- inizializza i campi `C`, `P`, `Inh` e `F`
-- evolve il sistema nel tempo con splitting di Strang
-- usa un passo esplicito per il termine di reazione e advezione
-- usa ADI per il sottopasso diffusivo di `C`, `P` e `Inh`
-- aggiorna le diagnostiche temporali: massa di `C`, massa di `F` ed energia discreta
-- restituisce i campi finali e una struttura `diagnostics` con griglia, parametri e serie temporali
-
-In pratica questo è il cuore del solver: dato un insieme di parametri, produce la soluzione al tempo finale.
-
-### `angio2d_ADI/plot_angio2d.m`
-
-Si occupa della visualizzazione dei risultati. A partire dai campi calcolati da `angio2d_core` e dalla struttura `diagnostics`, genera quattro figure:
-
-- mappe 2D finali di `C`, `P`, `Inh` e `F`
-- diagnostica temporale di masse ed energia
-- sezioni 1D lungo la mezzeria del dominio
-- campo TAF con gradiente sovrapposto tramite `quiver`
-
-Il file supporta anche il salvataggio automatico delle figure in una cartella dedicata, in formati come PNG, PDF o EPS.
-
-## Uso tipico
-
-Esempio minimo di esecuzione:
-
-```matlab
-p = default_params();
-[C, P, Inh, F, diagnostics] = angio2d_core(p);
-plot_angio2d(C, P, Inh, F, diagnostics);
-```
-
-## Esecuzione da terminale VS Code
-
-Per lavorare direttamente dal terminale integrato di VS Code, senza aprire l'applicazione grafica di MATLAB, usa una delle due modalità seguenti.
-
-### Modalita interattiva
-
-Avvia MATLAB in modalita testuale:
+Setup rapido:
 
 ```bash
-matlab -nodesktop -nosplash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r angio2d_c/requirements.txt
 ```
 
-Poi esegui questi comandi dentro MATLAB:
+## Entry point ufficiali
+- Run singolo: `scripts/run_simulation.py`
+- Batch da YAML: `scripts/run_batch.py`
+- SLURM OpenMP: `jobs/run_openmp.sbatch`
+- SLURM CUDA: `jobs/run_cuda.sbatch`
+- SLURM CUDA H100 campaign: `jobs/run_cuda_h100_campaign.sbatch`
 
-```matlab
-cd('/home/vincenzo/Documents/angio_2d/angio2d_ADI')
-p = default_params();
-[C, P, Inh, F, diagnostics] = angio2d_core(p);
-plot_angio2d(C, P, Inh, F, diagnostics);
-```
+Interfacce legacy/deprecate (wrapper benchmark storici e job `*_benchmark.sbatch`) non sono supportate.
 
-### Modalita batch
+## Griglie supportate
+`64, 128, 256, 512, 1024`
 
-Se vuoi eseguire tutto in un solo comando e terminare automaticamente alla fine del calcolo:
+## YAML canonici
+| YAML | Scopo | Comando | Backend | Output |
+|---|---|---|---|---|
+| `configs/run_profile.yaml` | Profilo standard locale | `python3 scripts/run_batch.py --config configs/run_profile.yaml --backend <serial\|openmp\|cuda>` | serial/openmp/cuda | `angio2d_c/output/` |
+| `configs/single_grid_debug.yaml` | Debug rapido singola griglia | `python3 scripts/run_batch.py --config configs/single_grid_debug.yaml --backend <openmp\|cuda\|serial>` | openmp (default) | `angio2d_c/output/` |
+| `configs/h100_cuda_campaign.yaml` | Campagna H100 (5 run per griglia) | `sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_campaign.yaml` | cuda | `results/h100_cuda_campaign/` |
 
+## Quickstart
+### Run singolo
 ```bash
-matlab -batch "cd('/home/vincenzo/Documents/angio_2d/angio2d_ADI'); p = default_params(); [C,P,Inh,F,diagnostics] = angio2d_core(p); plot_angio2d(C,P,Inh,F,diagnostics);"
+python3 scripts/run_simulation.py --backend serial --grid 128 --threads 1
+python3 scripts/run_simulation.py --backend openmp --grid 128 --threads 4
+python3 scripts/run_simulation.py --backend cuda --grid 128 --threads 1
 ```
 
-Questa seconda opzione e comoda per test ripetibili, automazione e collaborazione tra piu persone.
+Nota: `run_simulation.py` genera figure di default. Per disabilitarle: `--no-generate-plots`.
 
-## Esecuzione con GUI MATLAB
-
-Se vuoi lavorare con l'interfaccia grafica di MATLAB, apri un terminale e lancia semplicemente:
-
+### Batch locale
 ```bash
-matlab
+python3 scripts/run_batch.py --config configs/run_profile.yaml --backend openmp
+python3 scripts/run_batch.py --config configs/run_profile.yaml --backend cuda
 ```
 
-Questo comando avvia direttamente l'applicazione MATLAB con la GUI. Una volta aperto l'ambiente, imposta la cartella del progetto su `/home/vincenzo/Documents/angio_2d/angio2d_ADI` e poi esegui i comandi di simulazione descritti sopra.
-
-## Struttura del flusso
-
-1. `default_params.m` prepara i parametri.
-2. `angio2d_core.m` risolve il modello e restituisce la soluzione finale.
-3. `plot_angio2d.m` visualizza e, se richiesto, salva i risultati.
-
-## Riferimento concettuale
-
-La formulazione del problema e la scelta dello schema numerico sono coerenti con il PDF allegato, che introduce un'estensione bidimensionale del modello classico di angiogenesi tumorale e motiva l'uso di operator splitting e ADI per ridurre il costo computazionale della parte diffusiva.
-
----
-
-## OpenMP Benchmark (HPC Phase 2)
-
-The OpenMP benchmark workflow is fully reproducible through YAML + Python scripts and supports both local execution and SLURM submission.
-
-### Run Workflow
-
-Local:
-
+### Batch SLURM
 ```bash
-python3 scripts/run_openmp_benchmark_from_config.py --config configs/openmp_benchmark.yaml
+sbatch jobs/run_openmp.sbatch --config configs/run_profile.yaml
+sbatch jobs/run_cuda.sbatch --config configs/run_profile.yaml
 ```
 
-SLURM:
-
+### H100 CUDA campaign
 ```bash
-sbatch jobs/run_openmp_benchmark.sbatch configs/openmp_benchmark.yaml
+sbatch jobs/run_cuda_h100_campaign.sbatch --config configs/h100_cuda_campaign.yaml
 ```
 
-### Final Benchmark Suite
+## Dove trovare risultati
+### Output standard
+Root: `angio2d_c/output/`
 
-- Grids: `64x64`, `128x128`, `256x256`
-- Threads: `1, 2, 3, 4`
-- Repetitions: `5 runs/configuration`
-- Backend: OpenMP CPU
-- `512x512` is **not included** in the final suite due to current HPC cost/stability constraints.
+Per run:
+`<grid>x<grid>-<threads>threads/run-XXX/`
 
-### Professional Reporting Artifacts
+Contenuto:
+- `csv/` (diagnostica, campi finali, metadata, timing)
+- `figures/` (4 immagini finali, se plotting attivo)
+- `log.txt`
 
-Generate presentation-ready HPC reporting:
+Per batch:
+- `timing.csv` (aggregato run-level)
+- `speedup_summary.md` (sintesi leggibile)
+- `validation_summary.md` (se validazione attiva)
 
+### Output H100 campaign
+Root: `results/h100_cuda_campaign/`
+
+Contenuto:
+- `cuda_speedup_summary.csv`
+- `cuda_speedup_summary.md`
+- `cuda_env_report.json`
+- `slurm_<JOBID>.out`, `slurm_<JOBID>.err`
+
+## Regole operative CUDA (anti-ambiguità)
+- Profiling CUDA dettagliato: OFF di default (`ANGIO2D_CUDA_PROFILE=0`)
+- Per abilitarlo: `--cuda-profile-detailed` (CLI) o `ANGIO2D_CUDA_PROFILE=1`
+- Strict mode CUDA: ON di default nei benchmark (`ANGIO2D_CUDA_STRICT=1`)
+- Se CUDA fallisce in strict mode: run abortisce (no fallback silenzioso CPU)
+
+## Documentazione risultati
+- contratto artefatti ufficiali: `docs/results_official.md`
+- stato/report campagna H100: `docs/h100_cuda_campaign_results.md`
+
+## Repository hygiene
+Non versionare transienti:
+- `slurm-*.out`, `slurm-*.err`
+- log temporanei profiling
+- output intermedi raw non richiesti
+
+Check rapido:
 ```bash
-python3 scripts/generate_openmp_reporting.py
+git ls-files | rg "(run_pipeline|benchmark_from_config|run_.*benchmark\\.sbatch|slurm-|profiling_|results/cuda_profiling/)"
 ```
 
-This creates:
-
-`results/openmp_scaling/`
-
-- `csv/`: raw runs, performance summary, best-per-grid table, numerical validation table
-- `plots/`: `runtime_vs_threads.png`, `speedup_vs_threads.png`, `efficiency_vs_threads.png`, `runtime_vs_grid.png`
-- `logs/`: report generation log
-- `figures/`: solver final figures grouped by best thread per grid
-- `summaries/`: structured technical summary for report/presentation
-
-For a full technical discussion and interpretation, see:
-
-- `docs/phase2_openmp_results.md`
+Deve restituire vuoto.

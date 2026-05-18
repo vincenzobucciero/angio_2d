@@ -1,5 +1,12 @@
 .venv/
 
+# Build artifacts
+angio2d_c/build/
+angio2d_c/bin/
+*.o
+*.a
+*.so
+
 # Benchmark/runtime artifacts (keep repo clean)
 angio2d_c/output/*threads/
 angio2d_c/output/*/run-*/
@@ -10,4 +17,28 @@ angio2d_c/output/openmp_speedup_summary.csv
 angio2d_c/output/openmp_speedup_summary.md
 angio2d_c/output/presentation_openmp_summary.md
 
+# Test/debug logs
+profiling_*.log
+profiling_*.err
+slurm-*.out
+slurm-*.err
+
+# Results policy: ignore raw runs, allow official summaries
+results/*
+!results/h100_cuda_campaign/
+results/h100_cuda_campaign/*
+!results/h100_cuda_campaign/cuda_speedup_summary.csv
+!results/h100_cuda_campaign/cuda_speedup_summary.md
+!results/h100_cuda_campaign/cuda_env_report.json
+results/h100_cuda_campaign/slurm_*.out
+results/h100_cuda_campaign/slurm_*.err
+
+# Editor/OS files
 .vscode/
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.agents/
+.codex/
