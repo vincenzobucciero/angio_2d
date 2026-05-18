@@ -24,11 +24,11 @@ Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione 
 
 | Grid | Runs OK | Runs Failed | Mean Time (s) | Median Time (s) |
 |---|---:|---:|---:|---:|
-| 64x64 |  |  |  |  |
-| 128x128 |  |  |  |  |
-| 256x256 |  |  |  |  |
-| 512x512 |  |  |  |  |
-| 1024x1024 |  |  |  |  |
+| 64x64 | 1 | 0 | 1.119667 | 1.119667 |
+| 128x128 | 1 | 0 | 3.819542 | 3.819542 |
+| 256x256 | 1 | 0 | 28.432417 | 28.432417 |
+| 512x512 | 1 | 0 | 228.352442 | 228.352442 |
+| 1024x1024 | 1 | 0 | 6040.868769 | 6040.868769 |
 
 ## Note
 
@@ -47,14 +47,14 @@ Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione 
 | 512x512 | n.d. | n.d. | n.d. |
 | 1024x1024 | n.d. | n.d. | n.d. |
 
-### CPU vs GPU CUDA (V100, strict mode)
+### CPU vs GPU CUDA (ultimo job, strict mode)
 | Grid | CPU serial (s) | GPU CUDA (s) | GPU/CPU |
 |---|---:|---:|---:|
-| 64x64 | 0.645349 | 0.683379 | 1.06x |
-| 128x128 | 16.142345 | 3.618624 | 0.22x |
-| 256x256 | 319.976824 | 28.165658 | 0.09x |
-| 512x512 | n.d. | 227.842020 | n.d. |
-| 1024x1024 | n.d. | 6026.558008 | n.d. |
+| 64x64 | 0.645349 | 1.119667 | 1.74x |
+| 128x128 | 16.142345 | 3.819542 | 0.24x |
+| 256x256 | 319.976824 | 28.432417 | 0.09x |
+| 512x512 | n.d. | 228.352442 | n.d. |
+| 1024x1024 | n.d. | 6040.868769 | n.d. |
 
 Nota:
 - Su `512` e `1024` il seriale non è stato completato.
@@ -65,4 +65,4 @@ Nota:
 
 - In una fase precedente il run `1024` falliva e attivava strict mode.
 - La causa era nel kernel CUDA ADI (buffer Thomas dimensionati in modo fisso).
-- Stato attuale: fix applicato, run `1024` completato su GPU (`6026.558008 s`).
+- Stato attuale: fix applicato, run `1024` completato su GPU (`6040.868769 s`).
