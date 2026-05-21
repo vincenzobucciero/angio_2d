@@ -1,0 +1,46 @@
+# BASELINE CPU SERIALE - ANGIO2D
+# ================================
+# Single-threaded CPU reference implementation
+# Use this to establish baseline performance before GPU/OpenMP optimization
+#
+# MACHINE-SPECIFIC PARAMETERS:
+#   - grid_sizes: Choose based on available RAM and time budget
+#   - timeout_per_run: Adjust based on max acceptable single-run duration
+#   - runs: Typically 1 (only CPU, no need for median)
+#
+# PORTABLE PARAMETERS:
+#   - backend: Always 'serial' for this config
+#   - threads: Always [1] for serial (no parallelization)
+
+backend: serial
+
+# Grid configurations to benchmark
+# WARNING: Small grids (<64) run too fast; large grids (>1024) take hours
+# For quick testing: [64, 128, 256]
+# For full benchmark: [64, 128, 256, 512, 1024]
+grid_sizes:
+  - 64
+  - 128
+  - 256
+  - 512
+
+threads:
+  - 1
+
+# Number of runs per grid (for statistical averaging)
+# Serial: usually 1 run is sufficient (no need for median)
+runs: 1
+
+# Output directory (create subdirs automatically)
+# Relative paths expand from project root
+output_root: results/baseline_serial
+
+# Timeout per single run (in seconds)
+# Typical: 64x64=1s, 128x128=4s, 256x256=30s, 512x512=250s, 1024x1024=~6000s
+# Increase this if you get timeout errors
+timeout_per_run: 10800  # 3 hours per grid
+
+# Validation and plotting
+validate_against_serial: false  # Serial is the reference
+generate_plots: true
+continue_on_failure: false

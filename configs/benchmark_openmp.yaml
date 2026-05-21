@@ -1,0 +1,52 @@
+# OPENMP MULTITHREAD BENCHMARK - ANGIO2D
+# ========================================
+# Multi-threaded CPU parallelization benchmark
+# Use to measure OpenMP scaling vs serial baseline
+#
+# MACHINE-SPECIFIC PARAMETERS:
+#   - threads: Must match your available CPU cores
+#     Current machine: 8 cores → [1, 2, 4, 8]
+#   - grid_sizes: Same as baseline for fair comparison
+#   - timeout_per_run: May be shorter than serial due to parallelization
+#
+# PORTABLE PARAMETERS:
+#   - backend: Always 'openmp' for this config
+
+backend: openmp
+
+# Grid configurations (use SAME grids as baseline_serial for fair speedup comparison)
+grid_sizes:
+  - 64
+  - 128
+  - 256
+  - 512
+
+# Number of OpenMP threads to test
+# IMPORTANT: Match your CPU core count!
+# Examples:
+#   - 4-core CPU:  [1, 2, 4]
+#   - 8-core CPU:  [1, 2, 4, 8]
+#   - 16-core CPU: [1, 2, 4, 8, 16]
+# Running thread > cores usually hurts performance
+threads:
+  - 1
+  - 2
+  - 4
+  - 8
+
+# Number of runs per (grid, thread) combination
+# OpenMP: typically 3-5 runs to measure variability
+runs: 3
+
+# Output directory
+output_root: results/benchmark_openmp
+
+# Timeout per single run (in seconds)
+# Parallelized runs should be faster; adjust downward from serial times
+# Example: 512x512 serial=250s, with 8 threads ≈30s, so timeout=600 is safe
+timeout_per_run: 3600  # 1 hour per run
+
+# Validation and plotting
+validate_against_serial: true  # Compare results vs serial baseline
+generate_plots: true           # Generate scaling plots
+continue_on_failure: false     # Stop on first error

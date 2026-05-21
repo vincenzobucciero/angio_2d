@@ -40,7 +40,27 @@ mkdir -p "${ROOT_DIR}/results/h100_cuda_campaign"
 if command -v module >/dev/null 2>&1; then
   module purge || true
   module load "${CUDA_MODULE}" || true
+  # Load Python 3.10+ for compatibility with 'from __future__ import annotations'
+  module load python/3.10 2>/dev/null || module load python/3.9 2>/dev/null || true
 fi
+
+# Set Python binary with fallback chain (3.10+ required for 'from __future__ import annotations')
+PYTHON_BIN="${ANGIO2D_PYTHON:-}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+  # Try in order: python3.10, python3.11+, python3.9, python3.8, python3.7, python3
+  for py_candidate in python3.{10,11,12,9,8,7} python3; do
+    if command -v "${py_candidate}" >/dev/null 2>&1; then
+      PYTHON_BIN="${py_candidate}"
+      break
+    fi
+  done
+fi
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: No Python interpreter found in PATH. Required: Python >= 3.7" >&2
+  exit 1
+fi
+export ANGIO2D_PYTHON="${PYTHON_BIN}"
+echo "Using Python: ${PYTHON_BIN} ($("${PYTHON_BIN}" --version 2>&1))"
 
 export OMP_PROC_BIND="${OMP_PROC_BIND:-close}"
 export OMP_PLACES="${OMP_PLACES:-cores}"
@@ -52,7 +72,7 @@ export ANGIO2D_CUDA_PROFILE="${ANGIO2D_CUDA_PROFILE:-0}"
 export ANGIO2D_DIAG_STRIDE="${ANGIO2D_DIAG_STRIDE:-256}"
 export CUDA_NVCCFLAGS="${CUDA_NVCCFLAGS:--O3 -arch=sm_90}"
 
-PYTHON_BIN="${ANGIO2D_PYTHON:-python3}"
+PYTHON_BIN="${ANGIO2D_PYTHON}"
 GPU_GUARD_ENABLE="${GPU_GUARD_ENABLE:-1}"
 GPU_GUARD_MIN_UTIL="${GPU_GUARD_MIN_UTIL:-3}"
 GPU_GUARD_MIN_POWER_W="${GPU_GUARD_MIN_POWER_W:-70}"

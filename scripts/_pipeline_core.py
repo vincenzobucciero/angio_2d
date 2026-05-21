@@ -30,7 +30,7 @@ OUTPUT_ROOT = ANGIO2D_C / "output"
 OUTPUT_CSV_DIR = OUTPUT_ROOT / "csv"
 OUTPUT_FIG_DIR = OUTPUT_ROOT / "figures"
 DEFAULT_RESULTS_DIR = OUTPUT_ROOT
-GRID_TO_INDEX = {64: 0, 128: 1, 256: 2, 512: 3, 1024: 4}
+GRID_TO_INDEX = {64: 0, 128: 1, 256: 2, 512: 3, 1024: 4, 2048: 5}
 VALIDATION_FIELDS = ["diagnostics_c", "solution_c_C", "solution_c_P", "solution_c_Inh", "solution_c_F"]
 
 
@@ -233,8 +233,11 @@ def _set_cuda_runtime_env(backend: str, cuda_profile_detailed: bool) -> None:
     os.environ["ANGIO2D_CUDA_PROFILE"] = "1" if cuda_profile_detailed else "0"
 
 
-def _generate_plots() -> RunResult:
-    return _run([_python_exec(), "scripts/plot_results.py"], ANGIO2D_C)
+def _generate_plots(run_dir: Path) -> RunResult:
+    """Generate 4 standard benchmark plots from CSV data in run_dir."""
+    venv_python = ROOT / ".venv" / "bin" / "python3"
+    python_exe = str(venv_python) if venv_python.exists() else _python_exec()
+    return _run([python_exe, str(ROOT / "scripts" / "plot_benchmark_results.py"), str(run_dir)], ROOT)
 
 
 def _config_name(grid: int, threads: int) -> str:
@@ -409,10 +412,9 @@ def _run_validation_for_current_output(
 def _persist_outputs(run_dir: Path, generate_plots: bool) -> str:
     _copy_tree(OUTPUT_CSV_DIR, run_dir / "csv")
     if generate_plots:
-        pres = _generate_plots()
+        pres = _generate_plots(run_dir)
         if not pres.success:
             return f"plot: failed ({pres.reason})"
-        _copy_tree(OUTPUT_FIG_DIR, run_dir / "figures")
     return "plot: ok"
 
 
@@ -468,7 +470,6 @@ def _single_run(
                 run_dir,
             )
         )
-        _persist_outputs(run_dir, generate_plots)
 
     _write_log(run_dir / "log.txt", "\n".join(lines))
     print(f"Single pipeline completed in: {run_dir}")
@@ -482,7 +483,7 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
     threads = [int(x) for x in config.get("threads", default_threads)]
     runs = int(config.get("runs", 3))
     validate = bool(config.get("validate", config.get("validate_against_serial", True)))
-    generate_plots = bool(config.get("generate_plots", True))
+    generate_plots = bool(config.get("generate_plots", False))
     timeout_s = int(config.get("timeout_per_run", 600))
     continue_on_failure = bool(config.get("continue_on_failure", True))
     cuda_profile_detailed = bool(config.get("cuda_profile_detailed", False))
