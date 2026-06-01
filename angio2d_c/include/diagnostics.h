@@ -5,76 +5,76 @@
 #include "operators.h"
 
 /*
- * Struttura per la diagnostica temporale della simulazione.
+ * Structure for the simulation time diagnostics.
  *
- * Contiene:
- * - t   = tempi della simulazione
- * - mC  = massa totale delle cellule C
- * - mF  = massa totale della matrice F
- * - En  = energia del sistema
+ * Contains:
+ * - t   = simulation times
+ * - mC  = total C-cell mass
+ * - mF  = total F-matrix mass
+ * - En  = system energy
  *
- * - step = numero di timestep registrati
+ * - step = number of recorded time steps
  */
 typedef struct {
-    double *t;		/* Tempo */
-    double *mC;		/* Massa di C */
-    double *mF;		/* Massa di F */
-    double *En;		/* Energia */
-    double *gx_C;    /* Workspace gradiente x di C */
-    double *gy_C;    /* Workspace gradiente y di C */
-    int M;           /* Numero totale nodi */
-    int step;		/* Contatore timestep */
+    double *t;		/* Time */
+    double *mC;		/* C mass */
+    double *mF;		/* F mass */
+    double *En;		/* Energy */
+    double *gx_C;    /* C x-gradient workspace */
+    double *gy_C;    /* C y-gradient workspace */
+    int M;           /* Total number of nodes */
+    int step;		/* Time-step counter */
 } Diagnostics;
 
 /*
- * Alloca e inizializza la struttura Diagnostics.
+ * Allocate and initialize the Diagnostics structure.
  *
  * Input:
- *   Nsteps = numero massimo di timestep previsti
+ *   Nsteps = maximum number of expected time steps
  *
  * Output:
- *   puntatore a Diagnostics inizializzato
- *   oppure NULL in caso di errore
+ *   pointer to an initialized Diagnostics object
+ *   or NULL on error
  */
 Diagnostics* diagnostics_create(int Nsteps, int M);
 
 /*
- * Libera la memoria associata alla struttura Diagnostics.
+ * Free the memory associated with the Diagnostics structure.
  */
 void diagnostics_free(Diagnostics *diag);
 
 /*
- * Calcola l'integrale numerico di un campo 2D tramite regola del trapezio.
+ * Compute the numerical integral of a 2D field using the trapezoidal rule.
  *
- * Applica pesi:
- * - 1 nei nodi interni
+ * Applies weights:
+ * - 1 on interior nodes
  * - 1/2 sui bordi
  * - 1/4 agli angoli
  *
  * Input:
- *   u = campo discreto
- *   p = parametri della griglia
+ *   u = discrete field
+ *   p = grid parameters
  *
  * Output:
- *   valore dell'integrale sul dominio
+ *   value of the integral over the domain
  */
 double trap2d(const double *u, const Params *p);
 
 /*
- * Registra i valori diagnostici al tempo corrente.
+ * Record diagnostic values at the current time.
  *
- * Calcola e salva:
- * - tempo t
- * - massa di C
- * - massa di F
- * - energia del sistema
+ * Computes and stores:
+ * - time t
+ * - C mass
+ * - F mass
+ * - system energy
  *
  * Input:
- *   diag = struttura diagnostica
- *   C,F  = campi correnti
- *   op   = operatori discreti (per gradienti)
- *   p    = parametri
- *   t    = tempo corrente
+ *   diag = diagnostics structure
+ *   C,F  = current fields
+ *   op   = discrete operators (for gradients)
+ *   p    = parameters
+ *   t    = current time
  */
 void diagnostics_record(Diagnostics *diag, const double *C, const double *F,
                         const Operators *op, const Params *p, double t);

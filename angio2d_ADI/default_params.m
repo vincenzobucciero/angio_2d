@@ -1,100 +1,77 @@
 function p = default_params()
-    % Definisce una funzione senza argomenti in ingresso.
-    % La funzione restituisce una struct chiamata 'p'
-    % che contiene tutti i parametri fisici, numerici
-    % e di discretizzazione del modello Angio2D.
+    % Define a function with no input arguments.
+    % Returns a struct 'p' containing physical, numerical,
+    % and discretization parameters for the Angio2D model.
 
     p.Lx = 1; p.Ly = 1;
-    % Dimensioni del dominio spaziale rettangolare.
-    % Qui il dominio è [0, Lx] x [0, Ly] = [0,1] x [0,1].
+    % Spatial domain size [0,Lx] x [0,Ly] (default [0,1] x [0,1]).
 
     p.Mx = 64; p.My = 64;
-    % Numero di punti della griglia nelle due direzioni spaziali:
-    % - Mx punti lungo x
-    % - My punti lungo y
-    % Una griglia 64x64 dà una discretizzazione abbastanza fine
-    % senza essere troppo costosa dal punto di vista computazionale.
+    % Number of grid points in x and y directions:
+    % - Mx points along x
+    % - My points along y
+    % A 64x64 grid is a reasonable default for moderate cost.
 
     p.Tf = 0.5;
-    % Tempo finale della simulazione.
-    % Il solver evolverà il sistema da t = 0 fino a t = Tf.
+    % Final simulation time. Solver advances from t = 0 to t = Tf.
 
     p.dC = 0.001; p.dP = 0.001; p.dI = 0.001;
-    % Coefficienti di diffusione delle tre variabili che diffondono:
-    % - dC: diffusione delle cellule endoteliali C
-    % - dP: diffusione delle proteasi P
-    % - dI: diffusione dell'inibitore Inh
-    % Valori piccoli indicano diffusione lenta.
+    % Diffusion coefficients for the three diffusing variables:
+    % - dC: diffusion for endothelial cells C
+    % - dP: diffusion for proteases P
+    % - dI: diffusion for inhibitor I
+    % Small values correspond to slow diffusion.
 
     p.alpha1 = 0.4; p.alpha2 = 0.3; p.alpha3 = 0.5; p.alpha4 = 0.1;
-    % Parametri di sensibilità tattica:
-    % - alpha1: intensità dell'aptotassi/haptotassi rispetto a F (ECM)
-    % - alpha2: intensità della chemotassi rispetto a Inh
-    % - alpha3: intensità della chemotassi rispetto al TAF
-    % - alpha4: parametro di saturazione del contributo del TAF
-    %
-    % In pratica questi coefficienti controllano quanto fortemente
-    % le cellule rispondono ai gradienti chimici o della matrice.
+    % Tactic sensitivity parameters:
+    % - alpha1: haptotaxis (response to ECM F)
+    % - alpha2: chemotaxis to inhibitor I
+    % - alpha3: chemotaxis to TAF
+    % - alpha4: saturation parameter for TAF contribution
+    % These coefficients tune how strongly cells respond to gradients.
 
     p.k1 = 0.1; p.k2 = 0.3; p.k3 = 0.2;
-    % Prime tre costanti cinetiche del modello:
-    % - k1: crescita/proliferazione logistica delle cellule endoteliali
-    % - k2: degradazione della matrice extracellulare F dovuta alle proteasi
-    % - k3: interazione/reazione tra proteasi e inibitore
+    % Core kinetic constants:
+    % - k1: logistic growth rate of endothelial cells
+    % - k2: ECM degradation rate due to proteases
+    % - k3: interaction rate between proteases and inhibitor
 
     p.k4 = 0.4; p.k5 = 0.1; p.k6 = 0.2;
-    % Altre costanti cinetiche:
-    % - k4: produzione di proteasi indotta dalle cellule endoteliali
-    % - k5: produzione di proteasi indotta dal TAF
-    % - k6: decadimento naturale delle proteasi
+    % Additional kinetic constants:
+    % - k4: protease production induced by endothelial cells
+    % - k5: protease production induced by TAF
+    % - k6: natural protease decay
 
     p.epsilon = 1.0;
-    % Parametro che controlla la larghezza del profilo spaziale del TAF.
-    % In molti modelli il TAF è costruito come una gaussiana centrata
-    % vicino al bordo destro del dominio; epsilon regola quanto essa
-    % è diffusa o concentrata.
+    % Parameter controlling the spatial width of the TAF profile.
+    % T is typically a Gaussian centered near the right boundary;
+    % epsilon sets its spread.
 
     p.C0 = 1.0; p.a = 0.1; p.sigma_IC = 0.02;
-    % Parametri della condizione iniziale delle cellule endoteliali:
-    % - C0: valore massimo iniziale di densità cellulare
-    % - a: posizione iniziale del fronte cellulare
-    % - sigma_IC: larghezza della transizione del fronte
-    %
-    % Questi parametri vengono usati per costruire un profilo tipo tanh,
-    % cioè un fronte iniziale regolare e non discontinuo.
+    % Initial condition parameters for cells:
+    % - C0: initial peak cell density
+    % - a: initial front location
+    % - sigma_IC: front transition width
+    % These are used to build a smooth tanh profile for the initial front.
 
     hx = p.Lx/(p.Mx-1);
-    % Passo di griglia lungo x.
-    % Se il dominio [0,Lx] è suddiviso in Mx punti,
-    % la distanza tra due nodi consecutivi è Lx/(Mx-1).
+    % Grid spacing in x: Lx/(Mx-1).
 
     v_max = max([p.alpha1,p.alpha2,p.alpha3])*2/hx;
-    % Stima della velocità massima caratteristica del trasporto/avvezione.
-    % Si prende il massimo tra i coefficienti tattici alpha1, alpha2, alpha3
-    % e lo si combina con un fattore 2/hx, che deriva da una stima discreta
-    % del gradiente massimo su griglia.
-    %
-    % Questa quantità serve a imporre una condizione di stabilità
-    % sul passo temporale.
+    % Estimate of the maximum characteristic advective velocity.
+    % Use the maximum of alpha1, alpha2, alpha3 and scale by 2/hx
+    % as a discrete steep-gradient estimate. Used for time-step safety.
 
     tau_adv = hx/v_max;
-    % Passo temporale limite associato al vincolo advettivo/CFL.
-    % In sostanza, per stabilità numerica il passo di tempo deve essere
-    % proporzionato allo spazio e inversamente proporzionato alla velocità.
+    % Time-step limit associated with advective CFL constraint.
+    % For stability, dt should scale with space/hx and inverse velocity.
 
     p.tau = 0.8*tau_adv;
-    % Si sceglie il passo temporale effettivo come l'80% del limite stimato.
-    % Il fattore 0.8 introduce un margine di sicurezza per la stabilità.
+    % Choose actual time step as 80% of the estimated limit for safety.
 
     p.Nsteps = ceil(p.Tf/p.tau);
-    % Numero totale di passi temporali necessari per arrivare almeno a Tf.
-    % 'ceil' arrotonda per eccesso, così siamo sicuri di coprire tutto
-    % l'intervallo temporale [0, Tf].
+    % Total number of time steps to cover [0, Tf]. 'ceil' ensures coverage.
 
     p.tau = p.Tf/p.Nsteps;
-    % Ricalibrazione finale del passo temporale.
-    % Dopo aver fissato il numero intero di passi, si ridefinisce tau
-    % in modo che Nsteps * tau = Tf esattamente.
-    %
-    % Questo evita di fermarsi leggermente prima o leggermente dopo Tf.
+    % Final recalibration of tau so that Nsteps * tau == Tf exactly.
 end

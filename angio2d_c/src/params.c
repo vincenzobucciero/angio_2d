@@ -5,129 +5,109 @@
 #include <string.h>
 
 /*
- * Inizializza e restituisce la struttura Params.
+ * Initialize and return a Params structure.
  *
- * Contiene:
- * - parametri fisici del modello
- * - parametri numerici della discretizzazione
- * - passo temporale adattivo (CFL)
+ * Contains model physical parameters, numerical discretization
+ * settings, and an estimated time step (CFL-based).
  *
- * Output:
- *   puntatore a Params inizializzato
- *   oppure NULL in caso di errore
+ * Returns: pointer to initialized Params or NULL on error.
  */
 Params* params_init(void) {
-    Params *p = (Params*) malloc(sizeof(Params));		// Alloca struttura Params
-    if (!p) {		// Controlla allocazione
-        fprintf(stderr, "ERROR: Failed to allocate Params\n");		// Errore
-        return NULL;		// Esce
+    Params *p = (Params*) malloc(sizeof(Params));      // Allocate Params
+    if (!p) {                                          // Check allocation
+        fprintf(stderr, "ERROR: Failed to allocate Params\n");
+        return NULL;
     }
-    
-    /*
-     * Parametri principali del modello (equivalente default_params.m)
-     */
-    
-    p->Lx = 1.0;		// Lunghezza dominio in x
-    p->Ly = 1.0;		// Lunghezza dominio in y
-    p->Mx = 64;		// Numero nodi in x
-    p->My = 64;		// Numero nodi in y
-    p->Tf = 0.5;		// Tempo finale simulazione
-    
-    p->dC = 0.001;		// Diffusione cellule C
-    p->dP = 0.001;		// Diffusione proteasi P
-    p->dI = 0.001;		// Diffusione inibitore Inh
-    
-    p->alpha1 = 0.4;		// Aptotassi (ECM)
-    p->alpha2 = 0.3;		// Chemotassi (inibitore)
-    p->alpha3 = 0.5;		// Chemotassi (TAF)
-    p->alpha4 = 0.1;		// Saturazione TAF
-    
-    p->k1 = 0.1;		// Proliferazione C
-    p->k2 = 0.3;		// Degradazione ECM
-    p->k3 = 0.2;		// Interazione P-Inh
-    p->k4 = 0.4;		// Produzione P da C/TAF
-    p->k5 = 0.1;		// Produzione P da TAF
-    p->k6 = 0.2;		// Decadimento P
-    
-    p->epsilon = 1.0;		// Parametro spaziale del TAF
-    
-    p->C0 = 1.0;		// Valore massimo iniziale C
-    p->a = 0.1;		// Posizione fronte iniziale
-    p->sigma_IC = 0.02;		// Larghezza fronte iniziale
-    
-    /*
-     * Discretizzazione spaziale
-     */
-    p->hx = p->Lx / (p->Mx - 1);		// Passo griglia x
-    p->hy = p->Ly / (p->My - 1);		// Passo griglia y
-    
-    /*
-     * Stima CFL per stabilità (parte advettiva)
-     */
-    double alpha_max = fmax(fmax(p->alpha1, p->alpha2), p->alpha3);		// Massimo coefficiente tattico
-    double v_max = alpha_max * 2.0 / p->hx;		// Velocità massima stimata
-    double tau_adv = p->hx / v_max;		// Limite CFL
-    
-    p->tau = 0.8 * tau_adv;		// Passo temporale con margine sicurezza
-    p->Nsteps = (int) ceil(p->Tf / p->tau);		// Numero passi temporali
-    
-    p->tau = p->Tf / p->Nsteps;		// Ricalibrazione: Nsteps * tau = Tf
-    
-    return p;		// Restituisce struttura inizializzata
+
+    /* Core model parameters (defaults mirror default_params.m) */
+    p->Lx = 1.0;           // Domain length in x
+    p->Ly = 1.0;           // Domain length in y
+    p->Mx = 64;            // Grid nodes in x
+    p->My = 64;            // Grid nodes in y
+    p->Tf = 0.5;           // Final simulation time
+
+    p->dC = 0.001;         // Diffusion C
+    p->dP = 0.001;         // Diffusion P
+    p->dI = 0.001;         // Diffusion Inh
+
+    p->alpha1 = 0.4;       // Haptotaxis (ECM)
+    p->alpha2 = 0.3;       // Chemotaxis (inhibitor)
+    p->alpha3 = 0.5;       // Chemotaxis (TAF)
+    p->alpha4 = 0.1;       // TAF saturation
+
+    p->k1 = 0.1;           // Proliferation C
+    p->k2 = 0.3;           // ECM degradation
+    p->k3 = 0.2;           // P-Inh interaction
+    p->k4 = 0.4;           // P production from C/TAF
+    p->k5 = 0.1;           // P production from TAF
+    p->k6 = 0.2;           // P decay
+
+    p->epsilon = 1.0;      // Spatial parameter for TAF
+
+    p->C0 = 1.0;           // Initial max C
+    p->a = 0.1;            // Initial front position
+    p->sigma_IC = 0.02;    // Initial front width
+
+    /* Spatial discretization */
+    p->hx = p->Lx / (p->Mx - 1);   // Grid spacing x
+    p->hy = p->Ly / (p->My - 1);   // Grid spacing y
+
+    /* CFL estimate for advective stability */
+    double alpha_max = fmax(fmax(p->alpha1, p->alpha2), p->alpha3); // Max tactic coeff
+    double v_max = alpha_max * 2.0 / p->hx;    // Estimated max velocity
+    double tau_adv = p->hx / v_max;
+
+    p->tau = 0.8 * tau_adv;                    // Time step with safety margin
+    p->Nsteps = (int) ceil(p->Tf / p->tau);    // Number of time steps
+
+    p->tau = p->Tf / p->Nsteps;                // Recalibrate so Nsteps*tau = Tf
+
+    return p;                                  // Return initialized struct
 }
 
-/*
- * Stampa a video un riepilogo dei parametri principali.
- *
- * Utile per debug e verifica configurazione simulazione.
- */
+/* Print a brief summary of main parameters (useful for debugging). */
 void params_print(const Params *p) {
-    if (!p) {		// Controlla validità puntatore
-        fprintf(stderr, "ERROR: params_print received NULL pointer\n");		// Errore
-        return;		// Esce
+    if (!p) {                                      // Validate pointer
+        fprintf(stderr, "ERROR: params_print received NULL pointer\n");
+        return;
     }
-    
-    printf("\nParameters:\n");		// Titolo
-    
+
+    printf("\nParameters:\n");
+
     printf("  Grid:  %d x %d, Domain: [0,%.1f] x [0,%.1f]\n",
-           p->Mx, p->My, p->Lx, p->Ly);		// Informazioni griglia
-    
+           p->Mx, p->My, p->Lx, p->Ly);
+
     printf("  Time:  Tf=%.2f, tau=%.6e, Nsteps=%d\n",
-           p->Tf, p->tau, p->Nsteps);		// Informazioni temporali
-    
+           p->Tf, p->tau, p->Nsteps);
+
     printf("  Diff:  dC=%.4f, dP=%.4f, dI=%.4f\n",
-           p->dC, p->dP, p->dI);		// Coefficienti diffusione
-    
+           p->dC, p->dP, p->dI);
+
     printf("  Chem:  alpha1=%.2f, alpha2=%.2f, alpha3=%.2f, alpha4=%.2f\n",
-           p->alpha1, p->alpha2, p->alpha3, p->alpha4);		// Parametri tattici
-    
-    printf("\n");		// Riga vuota finale
+           p->alpha1, p->alpha2, p->alpha3, p->alpha4);
+
+    printf("\n");
 }
 
-/*
- * Libera la memoria associata alla struttura Params.
- */
+/* Free memory associated with Params. */
 void params_free(Params *p) {
-    if (p) free(p);		// Libera struttura se valida
+    if (p) free(p);
 }
 
 /*
- * Inizializza Params da un file YAML semplice.
- * 
- * Formato atteso (minimalista YAML):
+ * Initialize Params from a minimal YAML config file.
+ *
+ * Expected minimal format:
  *   grids:
  *     - { Mx: 64, My: 64 }
  *     - { Mx: 128, My: 128 }
- * 
- * Argomenti:
- *   config_path: percorso al file YAML
- *   grid_index:  indice della griglia (0, 1, 2, ...)
  *
- * Restituisce:
- *   Params* con Mx, My letti da config, resto di default
- *   NULL se errore (file non trovato, index fuori range, etc.)
+ * Arguments:
+ *   config_path: path to YAML file
+ *   grid_index: index of the grid to use (0, 1, ...)
  *
- * Nota: Se config_path è NULL, fallback a params_init() default.
+ * Returns: Params* with Mx/My set from config (rest are defaults), or NULL on error.
+ * Note: if config_path is NULL, falls back to params_init().
  */
 Params* params_init_from_yaml(const char *config_path, int grid_index) {
     if (!config_path) {
@@ -141,7 +121,7 @@ Params* params_init_from_yaml(const char *config_path, int grid_index) {
         return NULL;
     }
 
-    /* Leggi il file linea per linea e cerca grid entries */
+    /* Read file line-by-line and look for grid entries */
     char line[256];
     int grid_count = 0;
     int found_mx = 0, found_my = 0;
@@ -151,7 +131,7 @@ Params* params_init_from_yaml(const char *config_path, int grid_index) {
         /* Skip comments and empty lines */
         if (line[0] == '#' || line[0] == '\n') continue;
 
-        /* Cerca pattern "- { Mx: <number>, My: <number> }" */
+        /* Look for pattern "- { Mx: <num>, My: <num> }" */
         if (strstr(line, "Mx:") && strstr(line, "My:")) {
             if (grid_count == grid_index) {
                 /* Found target grid entry */
@@ -160,7 +140,7 @@ Params* params_init_from_yaml(const char *config_path, int grid_index) {
                     found_my = 1;
                     break;
                 }
-                /* Alternative format: try parsing with fewer spaces */
+                /* Alternative formats with fewer spaces */
                 if (sscanf(line, "  - { Mx: %d, My: %d }", &mx, &my) == 2) {
                     found_mx = 1;
                     found_my = 1;
@@ -183,7 +163,7 @@ Params* params_init_from_yaml(const char *config_path, int grid_index) {
         return NULL;
     }
 
-    /* Alloca e inizializza Params con Mx, My dal config */
+    /* Allocate and initialize Params with grid from config */
     Params *p = (Params*) malloc(sizeof(Params));
     if (!p) {
         fprintf(stderr, "ERROR: Failed to allocate Params\n");
@@ -194,7 +174,7 @@ Params* params_init_from_yaml(const char *config_path, int grid_index) {
     p->Mx = mx;
     p->My = my;
 
-    /* Rest of params (same as params_init) */
+    /* Rest of params (defaults) */
     p->Lx = 1.0;
     p->Ly = 1.0;
     p->Tf = 0.5;

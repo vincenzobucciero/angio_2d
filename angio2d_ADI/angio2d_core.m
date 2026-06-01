@@ -1,373 +1,272 @@
 % ANGIO2D
 %
-% Esempio d'uso del solver completo:
+% Example usage of the full solver:
 %
 %   p = default_params();
 %   [C, P, Inh, F, diag] = angio2d_core(p);
 %   plot_angio2d(C, P, Inh, F, diag);
 %
-% Questo file implementa il nucleo numerico del modello 2D di angiogenesi:
-% - costruzione della griglia cartesiana uniforme
-% - costruzione del campo TAF e dei suoi gradienti
-% - costruzione degli operatori discreti 1D e 2D
-% - inizializzazione delle variabili del modello
-% - integrazione temporale con Strang splitting
-% - diffusione trattata con schema ADI
-% - reazione/advezione trattate esplicitamente
-% - raccolta di diagnostiche numeriche
+% This file implements the numerical core of the 2D angiogenesis model:
+% - build uniform Cartesian grid
+% - construct the TAF field and its gradients
+% - build discrete 1D and 2D operators
+% - initialize model fields
+% - time integration via Strang splitting
+% - diffusion solved with ADI scheme
+% - reaction/advection treated explicitly
+% - collect numerical diagnostics
 
 function [C, P, Inh, F, diagnostics] = angio2d_core(p)
-    % Definisce la funzione principale del solver.
+    % Main solver function.
     %
     % Input:
-    %   p = struct contenente tutti i parametri del modello
+    %   p = struct with all model parameters
     %
     % Output:
-    %   C, P, Inh, F = campi finali al tempo finale Tf
-    %   diagnostics  = struttura con tempi, masse, energia e griglia
+    %   C, P, Inh, F = final fields at time Tf
+    %   diagnostics  = struct with times, masses, energy and grid
 
     if nargin < 1, p = default_params(); end
-    % Se l'utente non passa alcun parametro in ingresso,
-    % vengono caricati i parametri di default tramite default_params().
+    % If no parameter struct is provided, load defaults.
 
-    %% GRIGLIA
+    %% GRID
     hx = p.Lx/(p.Mx-1);
-    % Passo spaziale in direzione x.
+    % Grid spacing in x.
 
     hy = p.Ly/(p.My-1);
-    % Passo spaziale in direzione y.
+    % Grid spacing in y.
 
     x  = linspace(0, p.Lx, p.Mx)';
-    % Vettore colonna dei nodi lungo x, equispaziati in [0, Lx].
+    % Column vector of x-nodes.
 
     y  = linspace(0, p.Ly, p.My)';
-    % Vettore colonna dei nodi lungo y, equispaziati in [0, Ly].
+    % Column vector of y-nodes.
 
     [X, Y] = meshgrid(x, y);
-    % Costruisce la griglia bidimensionale.
-    % meshgrid produce matrici di coordinate X e Y.
+    % Build 2D coordinate arrays.
 
     X = X'; 
     Y = Y';   % Mx × My
-    % Trasposizione per avere matrici orientate come Mx x My,
-    % cioè coerenti con l'indicizzazione interna usata nel codice.
+    % Transpose to have arrays shaped Mx x My to match internal indexing.
 
-    M = p.Mx * p.My;  % DOF per variabile
-    % Numero totale di gradi di libertà per ciascun campo scalare.
-    % Ogni variabile vive su tutta la griglia 2D, quindi ha Mx*My nodi.
+    M = p.Mx * p.My;  % DOF per variable
+    % Total degrees of freedom per scalar field (Mx*My).
 
-    %% CAMPO TAF (analitico, precalcolato)
+    %% TAF FIELD (analytic, precomputed)
     T  = exp(-p.epsilon^(-1) * ((X-p.Lx).^2 + (Y-p.Ly/2).^2));
-    % Costruisce il campo TAF stazionario T(x,y).
-    % È una gaussiana centrata in prossimità del bordo destro del dominio
-    % nel punto (Lx, Ly/2), come nel paper.
+    % Stationary TAF field T(x,y): Gaussian centered near (Lx, Ly/2).
 
     Tx = -2*p.epsilon^(-1) * (X-p.Lx) .* T;
-    % Derivata parziale del TAF rispetto a x.
-    % Si ottiene derivando analiticamente la gaussiana.
+    % Partial derivative of TAF w.r.t. x.
 
     Ty = -2*p.epsilon^(-1) * (Y-p.Ly/2) .* T;
-    % Derivata parziale del TAF rispetto a y.
+    % Partial derivative of TAF w.r.t. y.
 
-    % Potenziale ausiliario
+    % Auxiliary potential components
     phi_x = Tx ./ (1 + p.alpha4*T);
-    % Componente x del gradiente del potenziale ausiliario phi.
-    % Serve per riscrivere il termine chemotattico relativo al TAF
-    % in forma più comoda dal punto di vista numerico.
+    % x-component of auxiliary potential gradient used for chemotaxis.
 
     phi_y = Ty ./ (1 + p.alpha4*T);
-    % Componente y del gradiente del potenziale ausiliario phi.
+    % y-component of auxiliary potential gradient.
 
-    %% OPERATORI SPAZIALI 2D (Kronecker)
+    %% 2D SPATIAL OPERATORS (Kronecker)
     [Lx1d, Gx1d] = build_1d_ops(p.Mx, hx);
-    % Costruisce gli operatori 1D lungo x:
-    % - Lx1d = Laplaciano discreto 1D
-    % - Gx1d = gradiente discreto 1D
+    % 1D operators along x: Lx1d = 1D Laplacian, Gx1d = 1D gradient
 
     [Ly1d, Gy1d] = build_1d_ops(p.My, hy);
-    % Costruisce gli operatori 1D lungo y.
+    % 1D operators along y
 
     Ix = speye(p.Mx);
-    % Matrice identità sparsa di dimensione Mx x Mx.
-
     Iy = speye(p.My);
-    % Matrice identità sparsa di dimensione My x My.
+    % 2 Sparse identity matrices of size Mx × Mx and My × My respectively.
 
     Lap2D = kron(Iy, sparse(Lx1d)) + kron(sparse(Ly1d), Ix);
-    % Costruisce il Laplaciano discreto 2D tramite prodotti di Kronecker.
-    % Questa è la discretizzazione standard su griglia cartesiana:
-    %   Δ_h = I_y ⊗ L_x + L_y ⊗ I_x
-    % come descritto nel paper.
+    % 2D Laplacian via Kronecker product: I_y ⊗ L_x + L_y ⊗ I_x
 
     Gx2D = kron(Iy, sparse(Gx1d));
-    % Gradiente discreto 2D in direzione x.
+    % 2D gradient in x-direction
 
     Gy2D = kron(sparse(Gy1d), Ix);
-    % Gradiente discreto 2D in direzione y.
+    % 2D gradient in y-direction
 
-    %% CONDIZIONI INIZIALI
+    %% INITIAL CONDITIONS
 
     C = p.C0 * 0.5 * (1 - tanh((X - p.a)/p.sigma_IC));
-    % Condizione iniziale della densità di cellule endoteliali.
-    % È un profilo sigmoide regolare, localizzato vicino al bordo sinistro,
-    % coerente con la formulazione data nel paper.
+    % Initial endothelial cell density: smooth sigmoidal front near left.
 
-    % Proteasi, Inibitore, ECM: perturbazioni coseno deterministiche [eq. (9)]
+    % Proteases, inhibitor, ECM: deterministic cosine perturbations
     P   = 0.1  + 0.01  * cos(2*pi*X) .* cos(2*pi*Y);
-    % Condizione iniziale delle proteasi:
-    % valore medio 0.1 + piccola perturbazione armonica.
+    % Protease IC: mean 0.1 + small harmonic perturbation.
 
     Inh = 0.1  + 0.005 * cos(4*pi*X) .* cos(4*pi*Y);
-    % Condizione iniziale dell'inibitore:
-    % anche qui valore medio costante + perturbazione liscia.
+    % Inhibitor IC: mean + smooth perturbation.
 
     F   = 1.0  + 0.01  * cos(pi*X)   .* cos(pi*Y);
-    % Condizione iniziale della matrice extracellulare (ECM).
-    % Il valore medio è 1.0 con piccola modulazione coseno.
+    % ECM IC: mean 1.0 with small cosine modulation.
 
-    %% VETTORIZZAZIONE
+    %% VECTORIZATION
     C = C(:); 
     P = P(:); 
     Inh = Inh(:); 
     F = F(:);
-    % Tutti i campi vengono convertiti da matrici Mx x My
-    % a vettori colonna di lunghezza M.
-    % Questo è necessario per applicare gli operatori matriciali 2D.
+    % Convert fields from Mx x My matrices to column vectors of length M
+    % for use with 2D matrix operators.
 
     T_v = T(:); 
     phi_x_v = phi_x(:); 
     phi_y_v = phi_y(:);
-    % Anche il TAF e i gradienti del potenziale ausiliario
-    % vengono vettorizzati per essere usati nelle operazioni algebriche.
+    % Vectorize TAF and auxiliary gradients as well.
 
-    tau    = p.tau;
-    % Passo temporale.
+    tau    = p.tau;    % time step
+    Nsteps = p.Nsteps; % total number of time steps
 
-    Nsteps = p.Nsteps;
-    % Numero totale di passi temporali.
+    %% DIAGNOSTICS (masses, energy)
+    diagnostics.t  = zeros(1, Nsteps+1);    % time vector
+    diagnostics.mC = zeros(1, Nsteps+1);    % mass of C over time
+    diagnostics.mF = zeros(1, Nsteps+1);    % mass of F over time
+    diagnostics.En = zeros(1, Nsteps+1);    % discrete energy
 
-    %% DIAGNOSTICA (masse, energia)
-    diagnostics.t  = zeros(1, Nsteps+1);
-    % Vettore dei tempi della simulazione.
-
-    diagnostics.mC = zeros(1, Nsteps+1);
-    % Massa totale della variabile C a ogni tempo.
-
-    diagnostics.mF = zeros(1, Nsteps+1);
-    % Massa totale della variabile F a ogni tempo.
-
-    diagnostics.En = zeros(1, Nsteps+1);
-    % Energia discreta monitorata nel tempo.
-
-    diagnostics.t(1)  = 0;
-    % Tempo iniziale.
-
-    diagnostics.mC(1) = trap2d(C);
-    % Massa iniziale di C calcolata con quadratura trapezoidale 2D.
-
-    diagnostics.mF(1) = trap2d(F);
-    % Massa iniziale di F.
+    diagnostics.t(1)  = 0;                  % Start time.
+    diagnostics.mC(1) = trap2d(C);          % Initial mass of C using trapezoidal quadrature.
+    diagnostics.mF(1) = trap2d(F);          % Initial mass of F.
 
     Cx = Gx2D*C; 
     Cy = Gy2D*C;
-    % Gradienti discreti iniziali di C nelle due direzioni.
+    % Initial gradients of C in the two directions.
 
     diagnostics.En(1) = 0.5*(p.dC*(Cx'*Cx + Cy'*Cy) + F'*F)*hx*hy;
-    % Energia discreta iniziale.
-    % Qui si usa:
-    % - contributo del gradiente di C pesato da dC
-    % - contributo quadratico di F
-    % moltiplicati per l'elemento di area hx*hy.
+    % Initial discrete energy: gradient contribution of C plus quadratic F,
+    % multiplied by element area hx*hy.
 
-    % TIME LOOP — Strang Splitting [eq. (33)]
+    % TIME LOOP — Strang splitting ]
     for n = 1:Nsteps
-        % Ciclo temporale principale.
-        % A ogni iterazione si avanza di un passo tau.
+        % Main time loop: advance by one time step each iteration.
 
-        % SEMI-PASSO REAZIONE
+        % REACTION HALF-STEP
         [C, P, Inh, F] = reaction_step(C, P, Inh, F, tau/2);
-        % Primo mezzo passo della parte non diffusiva:
-        % reazione + trasporto/tassi.
+        % First half-step for non-diffusive part: reaction + transport/rates.
 
         C = max(C,0); 
         P = max(P,0); 
         Inh = max(Inh,0); 
         F = max(F,0);
-        % Proiezione sui valori non negativi.
-        % Serve a evitare piccole oscillazioni numeriche non fisiche
-        % che produrrebbero concentrazioni negative.
+        % Enforce non-negativity to avoid non-physical negative values.
 
-        % PASSO DIFFUSIONE ADI
+        % ADI diffusion step
         C   = adi_step(C,   p.Mx, p.My, hx, hy, p.dC, tau);
-        % Diffusione di C risolta con ADI.
+        % Diffusion of C solved via ADI.
 
         P   = adi_step(P,   p.Mx, p.My, hx, hy, p.dP, tau);
-        % Diffusione di P risolta con ADI.
+        % Diffusion of P solved via ADI.
 
         Inh = adi_step(Inh, p.Mx, p.My, hx, hy, p.dI, tau);
-        % Diffusione di Inh risolta con ADI.
+        % Diffusion of Inh solved via ADI.
 
-        % F non diffonde:
-        % La variabile F non ha termine diffusivo nel modello,
-        % quindi durante questo sottopasso resta invariata.
+        % F does not diffuse in the model and remains unchanged here.
 
-        % SEMI-PASSO REAZIONE
+        % REACTION HALF-STEP
         [C, P, Inh, F] = reaction_step(C, P, Inh, F, tau/2);
-        % Secondo mezzo passo di reazione/trasporto.
-        % Insieme al primo mezzo passo realizza lo Strang splitting simmetrico.
+        % Second half-step of reaction/transport to complete Strang splitting.
 
         C = max(C,0); 
         P = max(P,0); 
         Inh = max(Inh,0); 
         F = max(F,0);
-        % Si impone nuovamente la non negatività dopo il secondo mezzo passo.
+        % Enforce non-negativity after the second half-step.
 
-        % Salva diagnostica
-        diagnostics.t(n+1)  = n*tau;
-        % Salva il tempo attuale.
-
-        diagnostics.mC(n+1) = trap2d(C);
-        % Massa di C al tempo corrente.
-
-        diagnostics.mF(n+1) = trap2d(F);
-        % Massa di F al tempo corrente.
+        % Save diagnostics
+        diagnostics.t(n+1)  = n*tau;          % Current time.
+        diagnostics.mC(n+1) = trap2d(C);      % Total mass of C at the current time.
+        diagnostics.mF(n+1) = trap2d(F);      % Total mass of F at the current time.
 
         Cx = Gx2D*C; 
         Cy = Gy2D*C;
-        % Ricalcola i gradienti di C per la stima energetica.
+        % Re-evaluate gradients of C for energy estimation.
 
         diagnostics.En(n+1) = 0.5*(p.dC*(Cx'*Cx + Cy'*Cy) + F'*F)*hx*hy;
-        % Aggiorna l'energia discreta.
+        % Update discrete energy.
     end
 
-    % Reshape per output
-    C   = reshape(C,   p.Mx, p.My);
-    % Riporta C dalla forma vettoriale alla forma matriciale 2D.
-
-    P   = reshape(P,   p.Mx, p.My);
-    % Riporta P in forma Mx x My.
-
-    Inh = reshape(Inh, p.Mx, p.My);
-    % Riporta Inh in forma Mx x My.
-
-    F   = reshape(F,   p.Mx, p.My);
-    % Riporta F in forma Mx x My.
+    % Reshape for output as 2D fields
+    C   = reshape(C,   p.Mx, p.My);     
+    P   = reshape(P,   p.Mx, p.My);     
+    Inh = reshape(Inh, p.Mx, p.My);     
+    F   = reshape(F,   p.Mx, p.My);     
 
     diagnostics.grid.x = x; 
     diagnostics.grid.y = y;
-    % Salva i vettori di griglia 1D nella struttura diagnostics.
+    % Save 1D grid vectors in the diagnostics structure.
 
     diagnostics.grid.X = X; 
     diagnostics.grid.Y = Y;
-    % Salva anche le matrici 2D di coordinate.
+    % Save also the 2D coordinate matrices.
 
     diagnostics.params = p;
-    % Memorizza una copia dei parametri usati nella simulazione.
+    % Save grid and parameters in diagnostics.
 
     function [Cn, Pn, In, Fn] = reaction_step(Cv, Pv, Iv, Fv, dt)
-        % Funzione annidata che esegue un passo esplicito di
-        % reazione + termini di trasporto/tassi.
+        % Nested function performing an explicit reaction + transport step.
         %
         % Input:
-        %   Cv, Pv, Iv, Fv = stato corrente in forma vettoriale
-        %   dt             = passo di tempo locale
+        %   Cv, Pv, Iv, Fv = current state (vectorized)
+        %   dt             = local time step
         %
         % Output:
-        %   Cn, Pn, In, Fn = nuovo stato dopo il passo esplicito
+        %   Cn, Pn, In, Fn = updated state after explicit step
 
-        % Operatori differenziali sullo stato corrente
-        Lap_I = Lap2D * Iv;
-        % Laplaciano discreto dell'inibitore I.
+        % Differential operators applied to the current state
+        Lap_I = Lap2D * Iv;    % discrete Laplacian of inhibitor I
+        Lap_F = Lap2D * Fv;    % discrete Laplacian of ECM F
 
-        Lap_F = Lap2D * Fv;
-        % Laplaciano discreto della matrice extracellulare F.
-
-        GxI = Gx2D * Iv;  
-        GyI = Gy2D * Iv;
-        % Gradienti di I nelle due direzioni.
-
-        GxF = Gx2D * Fv;  
-        GyF = Gy2D * Fv;
-        % Gradienti di F nelle due direzioni.
-
-        GxC = Gx2D * Cv;  
-        GyC = Gy2D * Cv;
-        % Gradienti di C nelle due direzioni.
+        GxI = Gx2D * Iv; GyI = Gy2D * Iv;  % gradients of I
+        GxF = Gx2D * Fv; GyF = Gy2D * Fv;  % gradients of F
+        GxC = Gx2D * Cv; GyC = Gy2D * Cv;  % gradients of C
 
         vx = p.alpha2*GxI - p.alpha1*GxF - p.alpha3*phi_x_v;
-        % Componente x del campo di velocità advettivo.
-        % Combina:
-        % - chemotassi rispetto a I
-        % - haptotassi rispetto a F
-        % - chemotassi rispetto al TAF tramite phi_x
+        % x-component of the advective velocity field combining:
+        % - chemotaxis to I
+        % - haptotaxis to F
+        % - chemotaxis to TAF via phi_x
 
         vy = p.alpha2*GyI - p.alpha1*GyF - p.alpha3*phi_y_v;
-        % Componente y del campo di velocità advettivo.
+        % y-component of advective velocity
 
         div_v = p.alpha2*Lap_I - p.alpha1*Lap_F;
-        % Divergenza del campo di velocità semplificata.
-        % In questa implementazione si usano i contributi di I e F.
-        % Il contributo associato a Delta(phi) non è incluso esplicitamente.
+        % Simplified divergence of velocity using contributions from I and F.
 
         RC = vx.*GxC + vy.*GyC + div_v.*Cv + p.k1*Cv.*(1-Cv);
-        % Termine sorgente della variabile C.
-        % Contiene:
-        % - trasporto advettivo v · grad(C)
-        % - termine compressibile (div v) C
-        % - crescita logistica k1 C (1-C)
+        % Source term for C: advective transport v·grad(C), compressible term
+        % (div v) C and logistic growth k1*C*(1-C).
 
         RP = -p.k3*Pv.*Iv + p.k4*T_v.*Cv + p.k5*T_v - p.k6*Pv;
-        % Termine di reazione della variabile P:
-        % - consumo per interazione con I
-        % - produzione indotta da C e dal TAF
-        % - decadimento naturale
+        % Reaction term for P: consumption by I, production by C and TAF,
+        % and natural decay.
 
         RI = -p.k3*Pv.*Iv;
-        % Termine di reazione dell'inibitore I:
-        % consumo per interazione con le proteasi.
+        % Reaction term for inhibitor I: consumption by proteases.
 
         RF = -p.k2*Pv.*Fv;
-        % Termine di reazione dell'ECM F:
-        % degradazione dovuta alla presenza di proteasi.
+        % Reaction term for ECM F: degradation by proteases.
 
-        % Forward Euler
+        % Forward Euler explicit update
         Cn = Cv + dt*RC;
-        % Aggiornamento esplicito di C con Euler in avanti.
-
         Pn = Pv + dt*RP;
-        % Aggiornamento esplicito di P.
-
         In = Iv + dt*RI;
-        % Aggiornamento esplicito di I.
-
         Fn = Fv + dt*RF;
-        % Aggiornamento esplicito di F.
     end
 
-    % QUADRATURA TRAPEZOIDALE 2D [eq. (46)]
+    % TRAPEZOIDAL 2D QUADRATURE
     function val = trap2d(u)
-        % Funzione annidata che approssima l'integrale di un campo 2D
-        % tramite la regola del trapezio composta su griglia rettangolare.
+        % Nested function that approximates the integral of a 2D field
+        % using the composite trapezoidal rule on the rectangular grid.
 
         U = reshape(u, p.Mx, p.My);
-        % Ricostruisce la matrice 2D a partire dal vettore.
-
         W = ones(p.Mx, p.My);
-        % Inizializza i pesi a 1 in tutti i nodi interni.
-
-        W(1,:) = 0.5; 
-        W(end,:) = 0.5;
-        % Peso 1/2 sui bordi sinistro e destro.
-
-        W(:,1) = 0.5; 
-        W(:,end) = 0.5;
-        % Peso 1/2 sui bordi inferiore e superiore.
-        % Agli angoli il peso diventa automaticamente 1/4
-        % perché il nodo appartiene a due bordi.
+        W(1,:) = 0.5; W(end,:) = 0.5; W(:,1) = 0.5; W(:,end) = 0.5;
+        % Corner nodes effectively have weight 1/4.
 
         val = hx * hy * sum(sum(W .* U));
-        % Approssimazione dell'integrale:
-        % somma pesata dei valori nodali moltiplicata per l'area elementare.
+        % Weighted sum times element area.
     end
 
 end
@@ -375,78 +274,76 @@ end
 
 
 function u_new = adi_step(u, Mx, My, hx, hy, d, tau)
-    % Esegue un passo diffusivo con metodo ADI (Alternating Direction Implicit).
+    % Perform a diffusion step using ADI (Alternating Direction Implicit).
     %
     % Input:
-    %   u   = campo vettorializzato da diffondere
-    %   Mx, My = numero di nodi in x e y
-    %   hx, hy = passi di griglia
-    %   d   = coefficiente di diffusione della variabile
-    %   tau = passo temporale completo
+    %   u   = vectorized field to diffuse
+    %   Mx, My = number of nodes in x and y
+    %   hx, hy = grid spacings
+    %   d   = diffusion coefficient
+    %   tau = full time step
     %
     % Output:
-    %   u_new = stato dopo il passo diffusivo
+    %   u_new = state after the diffusion step
 
     U = reshape(u, Mx, My);
-    % Ricostruisce il campo in forma matriciale 2D.
+    % Reshape field into 2D matrix.
 
     tau2 = tau / 2;
-    % Mezzo passo temporale, usato nei coefficienti ADI.
+    % Half time step used in ADI coefficients.
 
     rx = d * tau2 / hx^2;   % r_x = dτ/(2h_x²)
-    % Rapporto adimensionale di diffusione nella direzione x.
+    % Dimensionless diffusion ratio in x-direction.
 
     ry = d * tau2 / hy^2;   % r_y = dτ/(2h_y²)
-    % Rapporto adimensionale di diffusione nella direzione y.
+    % Dimensionless diffusion ratio in y-direction.
 
-    % SEMI-PASSO 1 (38)
+    % FIRST HALF-STEP
 
     RHS = zeros(Mx, My);
-    % Termine noto del primo semi-passo:
-    % esplicito in y, implicito in x.
+    % Right-hand side for first half-step (explicit in y, implicit in x).
 
     for j = 1:My
-        % Si costruisce una colonna alla volta del termine noto.
+        % Build RHS column-by-column.
 
         if j == 1
-            % Bordo inferiore con Neumann omogenea:
-            % il ghost node soddisfa u_{i,0} = u_{i,2}
+            % Lower boundary with homogeneous Neumann BC (ghost node u_{i,0}=u_{i,2}).
 
             RHS(:,j) = (1 - 2*ry)*U(:,j) + 2*ry*U(:,j+1);
-            % Formula modificata al bordo.
+            % Modified formula at the boundary.
 
         elseif j == My
-            % Bordo superiore con Neumann omogenea.
+            % Upper boundary with homogeneous Neumann BC.
 
             RHS(:,j) = 2*ry*U(:,j-1) + (1 - 2*ry)*U(:,j);
-            % Formula modificata al bordo.
+            % Modified formula at the boundary.
 
         else
             RHS(:,j) = ry*U(:,j-1) + (1 - 2*ry)*U(:,j) + ry*U(:,j+1);
-            % Formula standard ai nodi interni nella direzione y.
+            % Standard formula for internal nodes along y.
         end
     end
 
-    % Sistema tridiagonale eq. (41)
+    % Tridiagonal system for implicit x-step
     ax = -rx * ones(Mx, 1);  
     ax(1)   = 0;
-    % Sottodiagonale del sistema implicito in x.
+    % Subdiagonal of implicit x-system.
 
     bx = (1 + 2*rx) * ones(Mx, 1);
-    % Diagonale principale del sistema implicito in x.
+    % Main diagonal of implicit x-system.
 
     cx = -rx * ones(Mx, 1);  
     cx(end) = 0;
-    % Sovradiagonale del sistema implicito in x.
+    % Superdiagonal of implicit x-system.
 
     cx(1)   = -2*rx;  
-    % Correzione al bordo sinistro per condizione di Neumann.
+    % Left-boundary correction for Neumann BC.
 
     ax(end) = -2*rx;  
-    % Correzione al bordo destro per condizione di Neumann.
+    % Right-boundary correction for Neumann BC.
 
     U_star = zeros(Mx, My);
-    % Soluzione intermedia del primo semi-passo ADI.
+    % Intermediate solution after first ADI half-step.
 
     for j = 1:My
         U_star(:,j) = thomas(ax, bx, cx, RHS(:,j));
@@ -454,146 +351,108 @@ function u_new = adi_step(u, Mx, My, hx, hy, d, tau)
         % usando l'algoritmo di Thomas.
     end
 
-    % SEMI-PASSO 2: implicito y, esplicito x
+    % SECOND HALF-STEP: implicit in y, explicit in x
     RHS2 = zeros(Mx, My);
-    % Termine noto del secondo semi-passo.
+    % Right-hand side for the second half-step.
 
     for i = 1:Mx
-        % Si costruisce il termine noto riga per riga.
+        % Build RHS row-by-row.
 
         if i == 1
             RHS2(i,:) = (1 - 2*rx)*U_star(i,:) + 2*rx*U_star(i+1,:);
-            % Bordo sinistro con Neumann omogenea.
+            % Left boundary with homogeneous Neumann BC.
 
         elseif i == Mx
             RHS2(i,:) = 2*rx*U_star(i-1,:) + (1 - 2*rx)*U_star(i,:);
-            % Bordo destro con Neumann omogenea.
+            % Right boundary with homogeneous Neumann BC.
 
         else
             RHS2(i,:) = rx*U_star(i-1,:) + (1 - 2*rx)*U_star(i,:) + rx*U_star(i+1,:);
-            % Formula interna lungo x.
+            % Internal formula along x.
         end
     end
 
-    % Sistema tridiagonale T_y
+    % Tridiagonal system for implicit y-step
     ay = -ry * ones(My, 1);  
     ay(1)   = 0;
-    % Sottodiagonale del sistema implicito in y.
+    % Subdiagonal of implicit y-system.
 
     by = (1 + 2*ry) * ones(My, 1);
-    % Diagonale principale del sistema implicito in y.
+    % Main diagonal of implicit y-system.
 
     cy = -ry * ones(My, 1);  
     cy(end) = 0;
-    % Sovradiagonale del sistema implicito in y.
+    % Superdiagonal of implicit y-system.
 
     cy(1)   = -2*ry;
-    % Correzione al bordo inferiore.
+    % Lower-boundary correction.
 
     ay(end) = -2*ry;
-    % Correzione al bordo superiore.
+    % Upper-boundary correction.
 
     U_new = zeros(Mx, My);
-    % Campo finale dopo il passo ADI.
+    % Final field after ADI step.
 
     for i = 1:Mx
         U_new(i,:) = thomas(ay, by, cy, RHS2(i,:)')';
-        % Per ogni riga si risolve un sistema tridiagonale in y.
-        % La trasposizione serve perché thomas lavora con vettori colonna.
+        % Solve a tridiagonal system in y for each row.
+        % Transpose because thomas expects column vectors.
     end
 
     u_new = U_new(:);
-    % Ritorna il risultato in forma vettoriale.
+    % Return as vectorized field.
 end
 
 
 
 % THOMAS ALGORITHM
 function x = thomas(a, b, c, d)
-    % Risolve un sistema tridiagonale Ax = d con l'algoritmo di Thomas.
-    %
-    % a = sottodiagonale
-    % b = diagonale principale
-    % c = sovradiagonale
-    % d = termine noto
-    %
-    % Il metodo è efficiente e costa O(n).
+    % Solve tridiagonal system Ax = d with Thomas algorithm (O(n)).
+    % a = subdiagonal, b = main diagonal, c = superdiagonal, d = RHS
 
     n = length(b);
-    % Dimensione del sistema.
-
-    c_star = zeros(n, 1);
-    % Sovradiagonale modificata dopo eliminazione in avanti.
-
+    c_star = zeros(n, 1); 
     d_star = zeros(n, 1);
-    % Termine noto modificato.
-
+    
     % Forward sweep
     c_star(1) = c(1) / b(1);
-    % Primo coefficiente normalizzato della sovradiagonale.
-
     d_star(1) = d(1) / b(1);
-    % Primo coefficiente normalizzato del termine noto.
 
     for i = 2:n
-        denom = b(i) - a(i)*c_star(i-1);
-        % Pivot effettivo dopo eliminazione del termine sottodiagonale.
+        denom = b(i) - a(i)*c_star(i-1);            %Pivot element after elimination of the subdiagonal term.
 
         if i < n
             c_star(i) = c(i) / denom;
-            % Aggiorna la sovradiagonale modificata.
         end
-
         d_star(i) = (d(i) - a(i)*d_star(i-1)) / denom;
-        % Aggiorna il termine noto modificato.
     end
 
     % Back substitution
     x = zeros(n, 1);
-    % Inizializza il vettore soluzione.
-
     x(n) = d_star(n);
-    % Ultima componente della soluzione.
-
     for i = n-1:-1:1
         x(i) = d_star(i) - c_star(i)*x(i+1);
-        % Ricostruzione all'indietro delle altre componenti.
     end
 end
 
 
 
 function [L, G] = build_1d_ops(M, h)
-    % Costruisce gli operatori discreti 1D:
-    % - L = Laplaciano con condizioni di Neumann omogenee
-    % - G = gradiente centrale discreto
+    % Build 1D discrete operators:
+    % - L = Laplacian with homogeneous Neumann BCs
+    % - G = central difference gradient
 
-    % Laplaciano
-    L = gallery('tridiag', M, 1, -2, 1) / h^2;
-    % Crea la matrice tridiagonale standard del Laplaciano 1D.
+    % Laplacian
+    L = gallery('tridiag', M, 1, -2, 1) / h^2;  % Standard second-order central difference for the Laplacian.
+    L = full(L);                                % Convert to full matrix for easier manipulation.
+    L(1, 2)       = 2/h^2;                      % left boundary correction (ghost node)
+    L(end, end-1) = 2/h^2;                      % right boundary correction
 
-    L = full(L);
-    % Converte la matrice in formato pieno per poter modificare gli estremi.
-
-    L(1, 2)       = 2/h^2;   
-    % Correzione al bordo sinistro usando ghost node:
-    % u_0 = u_2, coerente con Neumann omogenea.
-
-    L(end, end-1) = 2/h^2;
-    % Correzione analoga al bordo destro:
-    % u_{M+1} = u_{M-1}.
-
-    % Gradiente centrale
+    % Central gradient
     G = zeros(M);
-    % Inizializza la matrice gradiente.
-
     for i = 2:M-1
         G(i, i+1) =  1/(2*h);
-        % Coefficiente del nodo successivo.
-
         G(i, i-1) = -1/(2*h);
-        % Coefficiente del nodo precedente.
     end
-    % Le righe di bordo restano nulle, coerentemente con
-    % il gradiente nullo imposto ai bordi da Neumann.
+    % Boundary rows remain zero consistent with zero Neumann gradient.
 end

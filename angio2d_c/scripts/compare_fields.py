@@ -1,39 +1,39 @@
 #!/usr/bin/env python3
-from pathlib import Path      # Gestione percorsi file
-import numpy as np            # Calcolo numerico
+from pathlib import Path     
+import numpy as np            
 
-# Directory base del progetto C
+# Project base directory
 BASE_DIR = Path(__file__).resolve().parents[1]
 
-# Directory output del progetto MATLAB
+# MATLAB project CSV output directory
 MATLAB_DIR = BASE_DIR.parent / "angio2d_ADI" / "output" / "csv"
 
 
 def rel_l2(a, b):
-    # Errore relativo in norma L2
+    # Relative L2 norm error
     denom = np.linalg.norm(b) + np.finfo(float).eps   # evita divisione per zero
     return np.linalg.norm(a - b) / denom
 
 
 def rel_inf(a, b):
-    # Errore relativo in norma infinito
+    # Relative L-infinity norm error
     denom = np.max(np.abs(b)) + np.finfo(float).eps
     return np.max(np.abs(a - b)) / denom
 
 
 def main():
-    fields = ["C", "P", "Inh", "F"]   # Campi finali da confrontare
+    fields = ["C", "P", "Inh", "F"]   # Final fields to compare
 
     print("Final field comparison C vs MATLAB")
     print("-" * 44)
 
-    compared = 0   # Conta quanti confronti sono stati eseguiti
+    compared = 0   # Count how many comparisons were performed
 
     for field in fields:
-        # File output C
+        # C output file
         c_file = BASE_DIR / "output" / "csv" / f"solution_c_{field}.csv"
 
-        # File output MATLAB
+        # MATLAB output file
         m_file = MATLAB_DIR / f"solution_matlab_{field}.csv"
 
         if not c_file.exists():
@@ -44,15 +44,15 @@ def main():
             print(f"SKIP: missing file {m_file}")
             continue
 
-        c = np.loadtxt(c_file, delimiter=",").reshape(-1)   # Carica campo C in vettore 1D
-        m = np.loadtxt(m_file, delimiter=",").reshape(-1)   # Carica campo MATLAB in vettore 1D
+        c = np.loadtxt(c_file, delimiter=",").reshape(-1)   # Load C field as 1D vector
+        m = np.loadtxt(m_file, delimiter=",").reshape(-1)   # Load MATLAB field as 1D vector
 
         if c.shape != m.shape:
-            print(f"{field}: shape mismatch C={c.shape}, MATLAB={m.shape}")   # Controllo compatibilità
+            print(f"{field}: shape mismatch C={c.shape}, MATLAB={m.shape}")   # Shape compatibility check
             return 1
 
-        diff = c - m   # Differenza punto-punto
-        idx = int(np.argmax(np.abs(diff)))   # Indice massimo errore assoluto
+        diff = c - m   # Pointwise difference
+        idx = int(np.argmax(np.abs(diff)))   # Index of max absolute error
 
         compared += 1
 
@@ -61,7 +61,7 @@ def main():
             f"relInf={rel_inf(c, m):.6e} "
             f"absMax={np.max(np.abs(diff)):.6e} "
             f"argmax={idx}"
-        )   # Stampa metriche principali per il campo corrente
+        )   # Print main metrics for current field
 
     print("-" * 44)
 
@@ -69,7 +69,7 @@ def main():
         print("No field pairs available. Comparison skipped.")
         return 0
 
-    print("near 0 -> close numerical match")   # Interpretazione del risultato
+    print("near 0 -> close numerical match")   # Interpretation
     return 0
 
 

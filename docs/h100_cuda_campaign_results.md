@@ -1,24 +1,24 @@
 # H100 CUDA Campaign Results
 
-Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione `h100gpu`.
+This page collects the official results of the CUDA campaign on the `h100gpu` partition.
 
 ## Setup
 
-- Backend: `cuda` (solo CUDA, nessuna validazione serial)
-- Griglie: `64, 128, 256, 512, 1024`
-- Run per griglia: `5`
+- Backend: `cuda` (CUDA-only, no serial validation)
+- Grids: `64, 128, 256, 512, 1024`
+- Runs per grid: `5`
 - Config: `configs/h100_cuda_campaign.yaml`
 - Job script: `jobs/run_cuda_h100_campaign.sbatch`
 - Strict mode: `ANGIO2D_CUDA_STRICT=1` (default)
-- Profiling dettagliato: OFF (`ANGIO2D_CUDA_PROFILE=0`, salvo override esplicito)
+- Detailed profiling: OFF (`ANGIO2D_CUDA_PROFILE=0`, unless explicitly overridden)
 
-## Artefatti sorgente
+## Source artifacts
 
 - Output root: `results/h100_cuda_campaign/`
 - Environment report: `results/h100_cuda_campaign/cuda_env_report.json`
-- Log scheduler: `results/h100_cuda_campaign/slurm_<JOBID>.out`
-- Summary aggregato: `results/h100_cuda_campaign/cuda_speedup_summary.csv`
-- Summary leggibile: `results/h100_cuda_campaign/cuda_speedup_summary.md`
+- Scheduler log: `results/h100_cuda_campaign/slurm_<JOBID>.out`
+- Aggregated summary: `results/h100_cuda_campaign/cuda_speedup_summary.csv`
+- Human-readable summary: `results/h100_cuda_campaign/cuda_speedup_summary.md`
 
 ## Tabella finale (da compilare a job concluso)
 
@@ -32,11 +32,11 @@ Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione 
 
 ## Note
 
-- I valori ufficiali devono essere copiati da `cuda_speedup_summary.csv` a fine campagna.
-- In caso di preemption/interruzioni, rilanciare il job con la stessa config per mantenere comparabilità.
-- Se una griglia fallisce in strict mode, il job si ferma intenzionalmente (no fallback CPU silenzioso).
+- Official values must be copied from `cuda_speedup_summary.csv` at campaign end.
+- In case of preemption or interruptions, re-run the job with the same config to preserve comparability.
+- If a grid fails in strict mode, the job stops intentionally (no silent CPU fallback).
 
-## Confronti ufficiali (sintesi)
+## Official comparisons (summary)
 
 ### CPU vs OpenMP (baseline utente)
 | Grid | CPU serial t=1 median (s) | OpenMP best median (s) | Best speedup |
@@ -56,13 +56,13 @@ Questa pagina raccoglie i risultati ufficiali della campagna CUDA su partizione 
 | 512x512 | n.d. | 228.352442 | n.d. |
 | 1024x1024 | n.d. | 6040.868769 | n.d. |
 
-Nota:
-- Su `512` e `1024` il seriale non è stato completato.
-- Run CUDA validate con `effective_backend=cuda` e `fallback_cpu_detected=no`.
-- CSV ufficiale unico: `docs/official_gpu_times.csv`.
+Note:
+- The serial run was not completed for `512` and `1024`.
+- CUDA validate runs use `effective_backend=cuda` and `fallback_cpu_detected=no`.
+- Single official CSV: `docs/official_gpu_times.csv`.
 
 ## Stato Diagnostico 1024 (storico)
 
-- In una fase precedente il run `1024` falliva e attivava strict mode.
-- La causa era nel kernel CUDA ADI (buffer Thomas dimensionati in modo fisso).
-- Stato attuale: fix applicato, run `1024` completato su GPU (`6040.868769 s`).
+-- In an earlier phase the `1024` run failed and triggered strict mode.
+-- The cause was in the CUDA ADI kernel (Thomas buffers with fixed sizing).
+-- Current status: fix applied; `1024` run completed on GPU (`6040.868769 s`).

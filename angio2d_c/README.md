@@ -1,16 +1,16 @@
 # ANGIO2D C Module
 
-Questo README non e' la guida utente principale.
+This README is not the main user guide.
 
-Guida ufficiale post-clone:
+Official post-clone guide:
 
 - `../README.md`
 
-Qui restano solo note tecniche sul modulo C/CUDA (sorgenti, include, build system).
+Only technical notes about the C/CUDA module remain here (sources, include, build system).
 
-## Build rapido varianti
+## Quick build variants
 
-Da root repository:
+From the repository root:
 
 ```bash
 cd angio2d_c
@@ -19,10 +19,10 @@ make openmp
 make cuda
 ```
 
-I binari vengono prodotti in:
+The binaries are produced in:
 
-- `angio2d_c/bin/angio2d_serial`
-- `angio2d_c/bin/angio2d_openmp`
-- `angio2d_c/bin/angio2d_cuda`
+- angio2d_c/bin/angio2d_serial
+- angio2d_c/bin/angio2d_openmp
+- angio2d_c/bin/angio2d_cuda
 
-Per esecuzione, YAML e output run, usare solo i comandi documentati in `../README.md`.
+For running, YAMLs and run outputs, use only the commands documented in `../README.md`.

@@ -5,7 +5,7 @@
 
 /**
  * @file grid.h
- * @brief Griglia strutturata uniforme 2D (linspace equivalente)
+ * @brief Uniform 2D structured grid (linspace equivalent)
  * 
  * MATLAB:
  *   hx = Lx/(Mx-1);
@@ -15,16 +15,16 @@
  */
 
 typedef struct {
-    double *X, *Y;      // Coordinate 2D (lunghezza Mx*My)
+    double *X, *Y;      // 2D coordinates (length Mx*My)
     int Mx, My;
     double hx, hy;
 } Grid;
 
 /**
- * Alloca e inizializza griglia
+ * Allocate and initialize the grid
  * 
- * Input: Params p (contiene Lx, Ly, Mx, My, hx, hy)
- * Output: Grid* con X[], Y[] arrays
+ * Input: Params p (contains Lx, Ly, Mx, My, hx, hy)
+ * Output: Grid* with X[], Y[] arrays
  * 
  * Linear indexing: (i,j) -> idx = i + Mx*j.
  * This matches MATLAB's column-wise flattening for arrays shaped Mx x My.
@@ -32,7 +32,7 @@ typedef struct {
 Grid* grid_create(const Params *p);
 
 /**
- * Dealloca griglia
+ * Deallocate the grid
  */
 void grid_free(Grid *g);
 

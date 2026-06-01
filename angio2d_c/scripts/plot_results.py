@@ -1,43 +1,43 @@
 #!/usr/bin/env python3
-from pathlib import Path      # Gestione percorsi
-import numpy as np            # Calcolo numerico
+from pathlib import Path
+import numpy as np
 import matplotlib
 
-# Backend non interattivo: utile per terminale / CI
+# Non-interactive backend for terminal / CI
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Directory base del progetto
+# Project base directory
 BASE_DIR = Path(__file__).resolve().parents[1]
 
-# Directory output
+# Output directory
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Directory figure
+# Figures directory
 OUTPUT_DIR_FIG = OUTPUT_DIR / "figures"
 OUTPUT_DIR_FIG.mkdir(exist_ok=True)
 
-# Nomi standard delle figure generate
+# Standard figure filenames
 FIG_NAMES = {
-    "fig1": "figure_1_campi_2d_t_f.jpeg",
-    "fig2": "figure_2_diagnostica_temporale.jpeg",
-    "fig3": "figure_3_sezioni_1d.jpeg",
-    "fig4": "figure_4_campo_taf.jpeg",
+    "fig1": "figure_1_fields_2d.jpeg",
+    "fig2": "figure_2_diagnostics.jpeg",
+    "fig3": "figure_3_sections_1d.jpeg",
+    "fig4": "figure_4_taf_field.jpeg",
 }
 
 
 def save_figure(fig, name_key: str):
-    # Salva una figura usando il nome standard associato
+    # Save a figure using the standard associated name
     filename = FIG_NAMES[name_key]
     fig.savefig(OUTPUT_DIR_FIG / filename, dpi=300)
 
 
-# File input principali
+# Main input files
 DIAG_FILE = OUTPUT_DIR / "csv" / "diagnostics_c.csv"
 METADATA_FILE = OUTPUT_DIR / "csv" / "run_metadata.csv"
 
-# File soluzione finale
+# Final solution files
 SOL_FILES = {
     "C": OUTPUT_DIR / "csv" / "solution_c_C.csv",
     "P": OUTPUT_DIR / "csv" / "solution_c_P.csv",
@@ -47,19 +47,19 @@ SOL_FILES = {
 
 
 def load_diagnostics(path: Path):
-    # Carica diagnostica: t, mC, mF, En
+    # Load diagnostics: t, mC, mF, En
     data = np.genfromtxt(path, delimiter=",", skip_header=1)
     return data[:, 0], data[:, 1], data[:, 2], data[:, 3]
 
 
 def load_solution(path: Path, mx: int, my: int):
-    # Carica soluzione finale e la rimodella come matrice 2D
+    # Load final solution and reshape to 2D matrix
     values = np.loadtxt(path)
-    return values.reshape((mx, my), order="F")   # ordine MATLAB / Fortran
+    return values.reshape((mx, my), order="F")   # MATLAB/Fortran column-major order
 
 
 def load_metadata(path: Path):
-    # Carica i parametri numerici della run
+    # Load numeric run parameters
     data = np.genfromtxt(path, delimiter=",", names=True)
     return {
         "mx": int(data["Mx"]),
@@ -76,7 +76,7 @@ def load_metadata(path: Path):
 
 
 def main():
-    # Verifica file necessari
+    # Check required files
     if not DIAG_FILE.exists():
         print(f"Missing diagnostics file: {DIAG_FILE}")
         return 1
@@ -85,7 +85,7 @@ def main():
         print(f"Missing run metadata file: {METADATA_FILE}")
         return 1
 
-    # Carica diagnostica e metadati
+    # Load diagnostics and metadata
     t, mC, mF, En = load_diagnostics(DIAG_FILE)
     meta = load_metadata(METADATA_FILE)
 
@@ -95,31 +95,31 @@ def main():
     ly = meta["ly"]
     epsilon = meta["epsilon"]
 
-    # Costruisce la griglia
+    # Create spatial grid
     x = np.linspace(0.0, lx, mx)
     y = np.linspace(0.0, ly, my)
-    X, Y = np.meshgrid(x, y, indexing="ij")   # coerente con il solver C / MATLAB
+    X, Y = np.meshgrid(x, y, indexing="ij")   # consistent with C/MATLAB solver
 
-    # Carica campi finali
+    # Load final solutions
     C = load_solution(SOL_FILES["C"], mx, my)
     P = load_solution(SOL_FILES["P"], mx, my)
     Inh = load_solution(SOL_FILES["Inh"], mx, my)
     F = load_solution(SOL_FILES["F"], mx, my)
 
     # ============================================================
-    # FIGURA 1: campi 2D finali
+    # FIGURE 1: final 2D fields
     # ============================================================
     fig1, axes1 = plt.subplots(2, 2, figsize=(10, 8))
 
     fields = [
-        (C, "C  (densita EC)", "viridis"),
-        (P, "P  (proteasi)", "hot"),
-        (Inh, "Inh  (inibitore)", "cool"),
+        (C, "C  (EC density)", "viridis"),
+        (P, "P  (protease)", "hot"),
+        (Inh, "Inh  (inhibitor)", "cool"),
         (F, "F  (ECM)", "summer"),
     ]
 
     for ax, (field, label, cmap_name) in zip(axes1.flat, fields):
-        im = ax.pcolormesh(X, Y, field, shading="gouraud", cmap=cmap_name)   # Mappa 2D
+        im = ax.pcolormesh(X, Y, field, shading="gouraud", cmap=cmap_name)   # 2D field map
         ax.set_aspect("equal")
         ax.set_xlabel("x")
         ax.set_ylabel("y")
@@ -132,82 +132,82 @@ def main():
     plt.close(fig1)
 
     # ============================================================
-    # FIGURA 2: diagnostica temporale
+    # FIGURE 2: temporal diagnostics
     # ============================================================
     fig2, axes2 = plt.subplots(2, 2, figsize=(10, 8))
 
-    axes2[0, 0].plot(t, mC, "b-", linewidth=1.5)   # Massa C
+    axes2[0, 0].plot(t, mC, "b-", linewidth=1.5)   # C mass
     axes2[0, 0].set_xlabel("t")
     axes2[0, 0].set_ylabel("∫ C dΩ")
-    axes2[0, 0].set_title("Massa cellule endoteliali")
+    axes2[0, 0].set_title("Endothelial cell mass")
     axes2[0, 0].grid(True, alpha=0.3)
 
-    axes2[0, 1].plot(t, mF, "r-", linewidth=1.5)   # Massa F
+    axes2[0, 1].plot(t, mF, "r-", linewidth=1.5)   # F mass
     axes2[0, 1].set_xlabel("t")
     axes2[0, 1].set_ylabel("∫ F dΩ")
-    axes2[0, 1].set_title("Massa ECM")
+    axes2[0, 1].set_title("ECM mass")
     axes2[0, 1].grid(True, alpha=0.3)
 
-    axes2[1, 0].plot(t, En, "k-", linewidth=1.5)   # Energia
+    axes2[1, 0].plot(t, En, "k-", linewidth=1.5)   # Energy
     axes2[1, 0].set_xlabel("t")
     axes2[1, 0].set_ylabel("E(t)")
-    axes2[1, 0].set_title("Energia discreta")
+    axes2[1, 0].set_title("Discrete energy")
     axes2[1, 0].grid(True, alpha=0.3)
 
-    mC_rel = (mC - mC[0]) / max(abs(mC[0]), np.finfo(float).eps)   # Variazione relativa massa C
-    mF_rel = (mF - mF[0]) / max(abs(mF[0]), np.finfo(float).eps)   # Variazione relativa massa F
+    mC_rel = (mC - mC[0]) / max(abs(mC[0]), np.finfo(float).eps)   # Relative change of C mass
+    mF_rel = (mF - mF[0]) / max(abs(mF[0]), np.finfo(float).eps)   # Relative change of F mass
 
     axes2[1, 1].plot(t, mC_rel, "b--", linewidth=1.2, label="C")
     axes2[1, 1].plot(t, mF_rel, "r--", linewidth=1.2, label="F")
     axes2[1, 1].set_xlabel("t")
     axes2[1, 1].set_ylabel("Δm / m0")
-    axes2[1, 1].set_title("Variazione relativa masse")
+    axes2[1, 1].set_title("Relative mass variation")
     axes2[1, 1].legend(loc="best")
     axes2[1, 1].grid(True, alpha=0.3)
 
-    fig2.suptitle("Diagnostica temporale")
+    fig2.suptitle("Temporal diagnostics")
     fig2.tight_layout()
     save_figure(fig2, "fig2")
     plt.close(fig2)
 
     # ============================================================
-    # FIGURA 3: sezioni 1D alla mezzeria
+    # FIGURE 3: 1D centerline sections
     # ============================================================
     fig3, axes3 = plt.subplots(2, 1, figsize=(9, 7))
-    jmid = int(round(my / 2.0)) - 1   # Indice della mezzeria discreta
+    jmid = int(round(my / 2.0)) - 1   # discrete centerline index
 
     axes3[0].plot(x, C[:, jmid], "b-", linewidth=1.5, label="C")
     axes3[0].plot(x, F[:, jmid], "r--", linewidth=1.5, label="F")
     axes3[0].set_xlabel("x")
-    axes3[0].set_ylabel("ampiezza")
-    axes3[0].set_title(f"C e F lungo y = {y[jmid]:.2f}")
+    axes3[0].set_ylabel("amplitude")
+    axes3[0].set_title(f"C and F along y = {y[jmid]:.2f}")
     axes3[0].legend(loc="best")
     axes3[0].grid(True, alpha=0.3)
 
     axes3[1].plot(x, P[:, jmid], "m-", linewidth=1.5, label="P")
     axes3[1].plot(x, Inh[:, jmid], "c--", linewidth=1.5, label="Inh")
     axes3[1].set_xlabel("x")
-    axes3[1].set_ylabel("ampiezza")
-    axes3[1].set_title(f"P e Inh lungo y = {y[jmid]:.2f}")
+    axes3[1].set_ylabel("amplitude")
+    axes3[1].set_title(f"P and Inh along y = {y[jmid]:.2f}")
     axes3[1].legend(loc="best")
     axes3[1].grid(True, alpha=0.3)
 
-    fig3.suptitle("Sezioni 1D — mezzeria")
+    fig3.suptitle("1D Sections — centerline")
     fig3.tight_layout()
     save_figure(fig3, "fig3")
     plt.close(fig3)
 
     # ============================================================
-    # FIGURA 4: campo TAF e gradiente
+    # FIGURE 4: TAF field and gradient
     # ============================================================
-    T = np.exp(-(1.0 / epsilon) * ((X - lx) ** 2 + (Y - ly / 2.0) ** 2))   # Profilo TAF
-    Tx = -2.0 * (1.0 / epsilon) * (X - lx) * T   # Gradiente x del TAF
-    Ty = -2.0 * (1.0 / epsilon) * (Y - ly / 2.0) * T   # Gradiente y del TAF
+    T = np.exp(-(1.0 / epsilon) * ((X - lx) ** 2 + (Y - ly / 2.0) ** 2)) # TAF field (Gaussian)
+    Tx = -2.0 * (1.0 / epsilon) * (X - lx) * T                           # Gradient x component
+    Ty = -2.0 * (1.0 / epsilon) * (Y - ly / 2.0) * T                     # Gradient y component
 
     fig4, ax4 = plt.subplots(figsize=(8, 6))
     im4 = ax4.pcolormesh(X, Y, T, shading="gouraud", cmap="jet")
 
-    skip = max(1, round(mx / 16))   # Sottocampionamento frecce
+    skip = max(1, round(mx / 16))   # Subsample arrows
     idx = np.arange(0, mx, skip)
     idy = np.arange(0, my, skip)
 
@@ -218,12 +218,12 @@ def main():
         Ty[np.ix_(idx, idy)],
         color="w",
         scale=18,
-    )   # Campo vettoriale del gradiente
+    )   # Gradient vector field
 
     ax4.set_aspect("equal")
     ax4.set_xlabel("x")
     ax4.set_ylabel("y")
-    ax4.set_title(f"TAF T(x,y) e ∇T, ε = {epsilon:.2f}")
+    ax4.set_title(f"TAF T(x,y) and ∇T, ε = {epsilon:.2f}")
     fig4.colorbar(im4, ax=ax4)
 
     fig4.tight_layout()
@@ -235,4 +235,4 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())   # Entry point script
+    raise SystemExit(main())   # Entry point

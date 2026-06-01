@@ -2,172 +2,171 @@
 #include <stdio.h>
 
 /*
- * Salva un singolo campo scalare in formato CSV.
+ * Save a single scalar field to CSV.
  *
- * Il file contiene un solo valore per riga, nell'ordine lineare
- * in cui il campo è memorizzato in memoria.
+ * The file contains one value per line in linear memory order.
  *
  * Input:
- *   field    = vettore del campo da salvare
- *   M        = numero totale di elementi
- *   filename = nome del file di output
+ *   field    = field vector to save
+ *   M        = total number of elements
+ *   filename = output filename
  */
 static void save_field_csv(const double *field, int M, const char *filename) {
-    FILE *fp = fopen(filename, "w");		// Apre il file in scrittura
-    if (!fp) {		// Controlla apertura file
-        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);		// Stampa errore
-        return;		// Esce senza salvare
+    /* Open file and write one value per line in linear order */
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);
+        return;
     }
 
-    for (int i = 0; i < M; i++) {		// Scorre tutti gli elementi del campo
-        fprintf(fp, "%.10e\n", field[i]);		// Scrive un valore per riga in formato scientifico
+    for (int i = 0; i < M; i++) {
+        fprintf(fp, "%.10e\n", field[i]);
     }
 
-    fclose(fp);		// Chiude il file
+    fclose(fp);
 }
 
 /*
- * Salva la diagnostica temporale in formato CSV.
+ * Save time series diagnostics to CSV.
  *
- * Il file contiene le colonne:
- *   t, mC, mF, Energy
+ * The file contains columns: t, mC, mF, Energy
  *
  * Input:
- *   diag     = struttura diagnostica
- *   p        = parametri del modello
- *   filename = nome del file di output
+ *   diag     = diagnostics structure
+ *   p        = model parameters
+ *   filename = output filename
  */
 void diagnostics_save_csv(const Diagnostics *diag, const Params *p,
                           const char *filename) {
-    (void)p;		// Parametro non usato direttamente in questa funzione
+    (void)p;    // unused parameter in this function
 
-    FILE *fp = fopen(filename, "w");		// Apre file CSV in scrittura
-    if (!fp) {		// Controlla apertura file
-        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);		// Stampa errore
-        return;		// Esce
+    FILE *fp = fopen(filename, "w");    // open CSV file for writing
+    if (!fp) {
+        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);
+        return;
     }
-    
-    fprintf(fp, "t,mC,mF,Energy\n");		// Scrive intestazione CSV
-    for (int i = 0; i < diag->step; i++) {		// Scorre tutti gli step registrati
+
+    fprintf(fp, "t,mC,mF,Energy\n");    // write CSV header
+    for (int i = 0; i < diag->step; i++) {
         fprintf(fp, "%.10e,%.10e,%.10e,%.10e\n",
-                diag->t[i], diag->mC[i], diag->mF[i], diag->En[i]);		// Scrive una riga per timestep
+                diag->t[i], diag->mC[i], diag->mF[i], diag->En[i]);
     }
 
-    fclose(fp);		// Chiude file
-    printf("Diagnostics saved to %s (%d timesteps)\n", filename, diag->step);		// Messaggio informativo
+    fclose(fp);    // close file
+    printf("Diagnostics saved to %s (%d timesteps)\n", filename, diag->step);
 }
 
 /*
- * Salva la soluzione finale dei quattro campi in file CSV separati.
+ * Save the final solution of the four fields into separate CSV files.
  *
- * I file prodotti sono:
+ * Produced files:
  *   prefix_C.csv
  *   prefix_P.csv
  *   prefix_Inh.csv
  *   prefix_F.csv
  *
  * Input:
- *   C, P, Inh, F = campi finali
- *   p            = parametri della simulazione
- *   prefix       = prefisso comune dei file
+ *   C, P, Inh, F = final fields
+ *   p            = simulation parameters
+ *   prefix       = common filename prefix
  */
 void save_solution_to_csv(const double *C, const double *P,
                           const double *Inh, const double *F,
                           const Params *p, const char *prefix) {
-    int M = p->Mx * p->My;		// Numero totale di nodi
-    char filename[256];		// Buffer per costruire i nomi file
-    
-    snprintf(filename, sizeof(filename), "%s_C.csv", prefix);		// Costruisce nome file per C
-    save_field_csv(C, M, filename);		// Salva campo C
-    
-    snprintf(filename, sizeof(filename), "%s_P.csv", prefix);		// Costruisce nome file per P
-    save_field_csv(P, M, filename);		// Salva campo P
-    
-    snprintf(filename, sizeof(filename), "%s_Inh.csv", prefix);		// Costruisce nome file per Inh
-    save_field_csv(Inh, M, filename);		// Salva campo Inh
-    
-    snprintf(filename, sizeof(filename), "%s_F.csv", prefix);		// Costruisce nome file per F
-    save_field_csv(F, M, filename);		// Salva campo F
-    
-    printf("Solution saved to %s_[CPIF].csv\n", prefix);		// Messaggio riepilogativo
+    int M = p->Mx * p->My;    // total number of nodes
+    char filename[256];    // buffer to build filenames
+
+    snprintf(filename, sizeof(filename), "%s_C.csv", prefix);    // build filename for C
+    save_field_csv(C, M, filename);    // save C field
+
+    snprintf(filename, sizeof(filename), "%s_P.csv", prefix);    // build filename for P
+    save_field_csv(P, M, filename);    // save P field
+
+    snprintf(filename, sizeof(filename), "%s_Inh.csv", prefix);    // build filename for Inh
+    save_field_csv(Inh, M, filename);    // save Inh field
+
+    snprintf(filename, sizeof(filename), "%s_F.csv", prefix);    // build filename for F
+    save_field_csv(F, M, filename);    // save F field
+
+    printf("Solution saved to %s_[CPIF].csv\n", prefix);    // summary message
 }
 
 /*
- * Salva i principali metadati della simulazione in un file CSV.
+ * Save the main run metadata into a CSV file.
  *
- * Il file contiene una sola riga con:
+ * The file contains a single row with:
  *   Mx, My, Lx, Ly, hx, hy, Tf, tau, Nsteps, epsilon
  *
  * Input:
- *   p        = parametri della simulazione
- *   filename = nome del file di output
+ *   p        = simulation parameters
+ *   filename = output filename
  */
 void save_run_metadata(const Params *p, const char *filename) {
-    FILE *fp = fopen(filename, "w");		// Apre file metadata
-    if (!fp) {		// Controlla apertura file
-        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);		// Stampa errore
-        return;		// Esce
+    FILE *fp = fopen(filename, "w");    // open metadata file
+    if (!fp) {
+        fprintf(stderr, "ERROR: Failed to open %s for writing\n", filename);
+        return;
     }
 
-    fprintf(fp, "Mx,My,Lx,Ly,hx,hy,Tf,tau,Nsteps,epsilon\n");		// Intestazione CSV
+    fprintf(fp, "Mx,My,Lx,Ly,hx,hy,Tf,tau,Nsteps,epsilon\n");    // CSV header
     fprintf(fp, "%d,%d,%.10e,%.10e,%.10e,%.10e,%.10e,%.10e,%d,%.10e\n",
             p->Mx, p->My, p->Lx, p->Ly, p->hx, p->hy,
-            p->Tf, p->tau, p->Nsteps, p->epsilon);		// Scrive i parametri in una riga
+            p->Tf, p->tau, p->Nsteps, p->epsilon);    // write parameters in one row
 
-    fclose(fp);		// Chiude file
-    printf("Run metadata saved to %s\n", filename);		// Messaggio informativo
+    fclose(fp);    // close file
+    printf("Run metadata saved to %s\n", filename);    // informational message
 }
 
 /*
- * Stampa a video un riepilogo finale della simulazione.
+ * Print a final run summary to stdout.
  *
- * Mostra:
- * - informazioni sulla griglia e sul tempo finale
- * - valori iniziali di mC, mF, E
- * - valori finali di mC, mF, E
- * - variazioni assolute e percentuali
+ * Shows:
+ * - grid information and final time
+ * - initial values of mC, mF, E
+ * - final values of mC, mF, E
+ * - absolute and percentage changes
  *
  * Input:
- *   diag = struttura diagnostica
- *   p    = parametri della simulazione
+ *   diag = diagnostics structure
+ *   p    = simulation parameters
  */
 void diagnostics_print_summary(const Diagnostics *diag, const Params *p) {
-    if (diag->step == 0) {		// Verifica che esista almeno una registrazione
-        printf("ERROR: No diagnostics recorded\n");		// Stampa errore
-        return;		// Esce
+    if (diag->step == 0) {    // ensure at least one record exists
+        printf("ERROR: No diagnostics recorded\n");
+        return;
     }
-    
-    printf("\n");		// Riga vuota iniziale
-    printf("==== SOLVER SUMMARY ====\n");		// Titolo del riepilogo
-    printf("Grid: %d × %d\n", p->Mx, p->My);		// Dimensione della griglia
-    printf("Domain: [0, %.2f] × [0, %.2f]\n", p->Lx, p->Ly);		// Estensione del dominio
-    printf("Final time: %.3f (tau=%.6e, Nsteps=%d)\n", p->Tf, p->tau, p->Nsteps);		// Parametri temporali
 
-    printf("\n---- DIAGNOSTICS ----\n");		// Separatore sezione diagnostica
-    printf("Timesteps recorded: %d\n", diag->step);		// Numero di timestep salvati
+    printf("\n");
+    printf("==== SOLVER SUMMARY ====\n");
+    printf("Grid: %d × %d\n", p->Mx, p->My);    // grid size
+    printf("Domain: [0, %.2f] × [0, %.2f]\n", p->Lx, p->Ly);    // domain extent
+    printf("Final time: %.3f (tau=%.6e, Nsteps=%d)\n", p->Tf, p->tau, p->Nsteps);    // time info
 
-    printf("\nInitial state:\n");		// Sezione stato iniziale
-    printf("  mC(0) = %.10e\n", diag->mC[0]);		// Massa iniziale di C
-    printf("  mF(0) = %.10e\n", diag->mF[0]);		// Massa iniziale di F
-    printf("  E(0)  = %.10e\n", diag->En[0]);		// Energia iniziale
-    
-    printf("\nFinal state:\n");		// Sezione stato finale
-    printf("  mC(T) = %.10e\n", diag->mC[diag->step-1]);		// Massa finale di C
-    printf("  mF(T) = %.10e\n", diag->mF[diag->step-1]);		// Massa finale di F
-    printf("  E(T)  = %.10e\n", diag->En[diag->step-1]);		// Energia finale
-    
-    printf("\nChange:\n");		// Sezione variazioni
+    printf("\n---- DIAGNOSTICS ----\n");
+    printf("Timesteps recorded: %d\n", diag->step);    // number of saved timesteps
+
+    printf("\nInitial state:\n");
+    printf("  mC(0) = %.10e\n", diag->mC[0]);    // initial C mass
+    printf("  mF(0) = %.10e\n", diag->mF[0]);    // initial F mass
+    printf("  E(0)  = %.10e\n", diag->En[0]);    // initial energy
+
+    printf("\nFinal state:\n");
+    printf("  mC(T) = %.10e\n", diag->mC[diag->step-1]);    // final C mass
+    printf("  mF(T) = %.10e\n", diag->mF[diag->step-1]);    // final F mass
+    printf("  E(T)  = %.10e\n", diag->En[diag->step-1]);    // final energy
+
+    printf("\nChange:\n");
     printf("  ΔmC = %.10e (%.2f%%)\n",
            diag->mC[diag->step-1] - diag->mC[0],
-           100.0*(diag->mC[diag->step-1] - diag->mC[0])/diag->mC[0]);		// Variazione assoluta e percentuale di mC
+           100.0*(diag->mC[diag->step-1] - diag->mC[0])/diag->mC[0]);    // absolute and percentage change of mC
 
     printf("  ΔmF = %.10e (%.2f%%)\n",
            diag->mF[diag->step-1] - diag->mF[0],
-           100.0*(diag->mF[diag->step-1] - diag->mF[0])/diag->mF[0]);		// Variazione assoluta e percentuale di mF
+           100.0*(diag->mF[diag->step-1] - diag->mF[0])/diag->mF[0]);    // absolute and percentage change of mF
 
     printf("  ΔE  = %.10e (%.2f%%)\n",
            diag->En[diag->step-1] - diag->En[0],
-           100.0*(diag->En[diag->step-1] - diag->En[0])/diag->En[0]);		// Variazione assoluta e percentuale di energia
+           100.0*(diag->En[diag->step-1] - diag->En[0])/diag->En[0]);    // absolute and percentage change of energy
 
-    printf("\n");		// Riga vuota finale
+    printf("\n");
 }

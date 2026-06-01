@@ -6,7 +6,7 @@
 
 /**
  * @file taf.h
- * @brief Campo TAF (Tumor Angiogenic Factor) gaussiano precalcolato
+ * @brief Precomputed Gaussian TAF (Tumor Angiogenic Factor) field
  * 
  * MATLAB:
  *   T = exp(-1/epsilon * ((X-Lx)^2 + (Y-Ly/2)^2))
@@ -18,19 +18,19 @@
 
 typedef struct {
     double *T;          // TAF field (Mx*My)
-    double *Tx, *Ty;    // Gradienti TAF (Mx*My)
-    double *phi_x;      // Potenziale saturo x (Mx*My)
-    double *phi_y;      // Potenziale saturo y (Mx*My)
+    double *Tx, *Ty;    // TAF gradients (Mx*My)
+    double *phi_x;      // Saturated x potential (Mx*My)
+    double *phi_y;      // Saturated y potential (Mx*My)
     int Mx, My;
 } TAF;
 
 /**
- * Calcola campo TAF e derivate da griglia
+ * Compute TAF field and derivatives from the grid
  */
 TAF* taf_compute(const Params *p, const Grid *g);
 
 /**
- * Dealloca TAF
+ * Deallocate TAF
  */
 void taf_free(TAF *t);
 

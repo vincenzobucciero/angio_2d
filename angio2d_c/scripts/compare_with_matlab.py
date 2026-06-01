@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-from pathlib import Path      # Gestione percorsi file
-import numpy as np            # Calcolo numerico
-import matplotlib.image as mpimg   # Lettura immagini
+from pathlib import Path      
+import numpy as np            
+import matplotlib.image as mpimg   
 
-# Directory figure del progetto C
 BASE_DIR = Path(__file__).resolve().parents[1]
 C_OUT = BASE_DIR / "output" / "figures"
 
-# Directory figure del progetto MATLAB
+# MATLAB project output directory
 MAT_OUT = BASE_DIR.parent / "angio2d_ADI" / "output"
 
-# Coppie di immagini da confrontare
+# Image pairs to compare (C output, MATLAB reference)
 pairs = [
     (C_OUT / "figure_1_campi_2d_t_f.jpeg", MAT_OUT / "fig1.jpeg"),
     (C_OUT / "figure_2_diagnostica_temporale.jpeg", MAT_OUT / "fig2.jpeg"),
@@ -20,14 +19,14 @@ pairs = [
 
 
 def to_float(img):
-    # Converte immagine in float64 e normalizza se intera
+    # Convert image to float64 and normalize if integer type
     if img.dtype.kind in ("u", "i"):
         return img.astype(np.float64) / 255.0
     return img.astype(np.float64)
 
 
 def center_crop_to_match(a, b):
-    # Ritaglia centralmente due immagini alla dimensione comune minima
+    # Center-crop two images to the common minimum size
     h = min(a.shape[0], b.shape[0])
     w = min(a.shape[1], b.shape[1])
 
@@ -40,7 +39,7 @@ def center_crop_to_match(a, b):
 
 
 def main():
-    compared = 0   # Conta confronti eseguiti
+    compared = 0   # Count comparisons performed
 
     print("Image comparison C vs MATLAB")
     print("-" * 40)
@@ -50,23 +49,23 @@ def main():
             print(f"SKIP: missing {c_file.name} or {m_file.name}")
             continue
 
-        c_img = to_float(mpimg.imread(c_file))   # Carica immagine C
-        m_img = to_float(mpimg.imread(m_file))   # Carica immagine MATLAB
+        c_img = to_float(mpimg.imread(c_file))   # Load C image
+        m_img = to_float(mpimg.imread(m_file))   # Load MATLAB image
 
-        c_img, m_img = center_crop_to_match(c_img, m_img)   # Allinea dimensioni via crop centrale
+        c_img, m_img = center_crop_to_match(c_img, m_img)   # Align sizes via center crop
 
         if c_img.shape[2] == 4:
-            c_img = c_img[:, :, :3]   # Rimuove canale alpha se presente
+            c_img = c_img[:, :, :3]   # Drop alpha channel if present
         if m_img.shape[2] == 4:
-            m_img = m_img[:, :, :3]   # Rimuove canale alpha se presente
+            m_img = m_img[:, :, :3]   # Drop alpha channel if present
 
-        diff = c_img - m_img   # Differenza pixel a pixel
+        diff = c_img - m_img   # Pixel-wise difference
         mae = float(np.mean(np.abs(diff)))   # Mean Absolute Error
         rmse = float(np.sqrt(np.mean(diff * diff)))   # Root Mean Square Error
 
         compared += 1
 
-        print(f"{c_file.name}: MAE={mae:.5f}, RMSE={rmse:.5f}")   # Stampa metriche
+        print(f"{c_file.name}: MAE={mae:.5f}, RMSE={rmse:.5f}")   # Print metrics
 
     print("-" * 40)
 
@@ -74,7 +73,7 @@ def main():
         print("No image pairs available. Comparison skipped.")
         return 0
 
-    print("Lower is better. Near 0 means highly similar visuals.")   # Interpretazione risultato
+    print("Lower is better. Near 0 means highly similar visuals.")   # Interpretation
     return 0
 
 

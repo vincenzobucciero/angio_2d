@@ -1,93 +1,86 @@
-#include "grid.h"		// Definizione struct Grid e prototipi
-#include <stdlib.h>		// malloc, free
-#include <stdio.h>		// fprintf
+#include "grid.h"       
+#include <stdlib.h>
+#include <stdio.h>
 
 /*
- * Crea e inizializza la griglia 2D.
+ * Create and initialize the 2D grid.
  *
- * La funzione costruisce le coordinate della griglia cartesiana uniforme
- * corrispondente ai parametri del dominio:
- * - X = coordinate x di tutti i nodi
- * - Y = coordinate y di tutti i nodi
+ * Builds the uniform Cartesian grid coordinates for the domain:
+ * - X = x coordinate of every node
+ * - Y = y coordinate of every node
  *
- * Le coordinate sono memorizzate in formato vettoriale 1D con indice:
+ * Coordinates are stored as 1D arrays using linear index:
  *     idx = i + Mx * j
  *
  * Input:
- *   p = struttura dei parametri numerici
+ *   p = numeric parameters struct
  *
- * Output:
- *   puntatore a una struttura Grid allocata e inizializzata
- *   oppure NULL in caso di errore
+ * Returns:
+ *   pointer to an allocated and initialized Grid, or NULL on error
  */
 Grid* grid_create(const Params *p) {
-    if (!p) {		// Controlla che il puntatore ai parametri sia valido
-        fprintf(stderr, "ERROR: grid_create received NULL Params\n");		// Stampa errore
-        return NULL;		// Esce con errore
+    if (!p) {        // ensure params pointer is valid
+        fprintf(stderr, "ERROR: grid_create received NULL Params\n");
+        return NULL;
     }
-    
-    Grid *g = (Grid*) malloc(sizeof(Grid));		// Alloca struttura principale Grid
-    if (!g) {		// Verifica allocazione
-        fprintf(stderr, "ERROR: Failed to allocate Grid\n");		// Stampa errore
-        return NULL;		// Esce
+
+    Grid *g = (Grid*) malloc(sizeof(Grid));        // allocate main Grid struct
+    if (!g) {        // allocation check
+        fprintf(stderr, "ERROR: Failed to allocate Grid\n");
+        return NULL;
     }
-    
-    int M = p->Mx * p->My;		// Numero totale di nodi della griglia
-    
-    g->X = (double*) malloc(M * sizeof(double));		// Array coordinate x della griglia 2D
-    g->Y = (double*) malloc(M * sizeof(double));		// Array coordinate y della griglia 2D
-    
-    if (!g->X || !g->Y) {		// Verifica allocazioni dei vettori coordinate
-        fprintf(stderr, "ERROR: Failed to allocate coordinate arrays\n");		// Stampa errore
-        free(g->X);		// Libera X se allocato
-        free(g->Y);		// Libera Y se allocato
-        free(g);		// Libera struttura principale
-        return NULL;		// Esce con errore
+
+    int M = p->Mx * p->My;        // total number of grid nodes
+
+    g->X = (double*) malloc(M * sizeof(double));        // x coordinates array for 2D grid
+    g->Y = (double*) malloc(M * sizeof(double));        // y coordinates array for 2D grid
+
+    if (!g->X || !g->Y) {        // check coordinate array allocations
+        fprintf(stderr, "ERROR: Failed to allocate coordinate arrays\n");
+        free(g->X);
+        free(g->Y);
+        free(g);
+        return NULL;
     }
-    
-    g->Mx = p->Mx;		// Salva numero nodi in x
-    g->My = p->My;		// Salva numero nodi in y
-    g->hx = p->hx;		// Salva passo spaziale in x
-    g->hy = p->hy;		// Salva passo spaziale in y
-    
+
+    g->Mx = p->Mx;        // store grid dimensions
+    g->My = p->My;
+    g->hx = p->hx;        // store spatial step in x
+    g->hy = p->hy;        // store spatial step in y
+
     // MATLAB: x = linspace(0, Lx, Mx)
-    // Equivalente: x[i] = i * hx per i = 0..Mx-1
-    double *x = (double*) malloc(p->Mx * sizeof(double));		// Vettore coordinate 1D in x
-    double *y = (double*) malloc(p->My * sizeof(double));		// Vettore coordinate 1D in y
-    
-    for (int i = 0; i < p->Mx; i++) {		// Costruisce il vettore x
-        x[i] = i * p->hx;		// Nodo i-esimo lungo x
+    // Equivalent: x[i] = i * hx for i = 0..Mx-1
+    double *x = (double*) malloc(p->Mx * sizeof(double));        // 1D x coordinates vector
+    double *y = (double*) malloc(p->My * sizeof(double));        // 1D y coordinates vector
+
+    for (int i = 0; i < p->Mx; i++) {        // build x vector
+        x[i] = i * p->hx;        // i-th node along x
     }
-    for (int j = 0; j < p->My; j++) {		// Costruisce il vettore y
-        y[j] = j * p->hy;		// Nodo j-esimo lungo y
+    for (int j = 0; j < p->My; j++) {        // build y vector
+        y[j] = j * p->hy;        // j-th node along y
     }
-    
+
     // MATLAB: [X, Y] = meshgrid(x, y); X = X'; Y = Y';
-    // Riempire 2D grid in ordine riga-major: idx = i + Mx*j
-    for (int i = 0; i < p->Mx; i++) {		// Loop sui nodi x
-        for (int j = 0; j < p->My; j++) {		// Loop sui nodi y
-            int idx = i + p->Mx * j;		// Indice lineare del nodo (i,j)
-            g->X[idx] = x[i];		// Coordinata x del nodo
-            g->Y[idx] = y[j];		// Coordinata y del nodo
+    // Fill 2D grid in row-major order: idx = i + Mx*j
+    for (int i = 0; i < p->Mx; i++) {        // loop over x nodes
+        for (int j = 0; j < p->My; j++) {        // loop over y nodes
+            int idx = i + p->Mx * j;        // linear index for (i,j)
+            g->X[idx] = x[i];        // x coordinate at node
+            g->Y[idx] = y[j];        // y coordinate at node
         }
     }
-    
-    free(x);		// Libera vettore temporaneo x
-    free(y);		// Libera vettore temporaneo y
-    
-    return g;		// Restituisce griglia inizializzata
+
+    free(x);        // free temporary x vector
+    free(y);        // free temporary y vector
+
+    return g;        // return initialized grid
 }
 
-/*
- * Libera la memoria associata alla struttura Grid.
- *
- * Input:
- *   g = puntatore alla griglia da deallocare
- */
+/* Free memory associated with the Grid. */
 void grid_free(Grid *g) {
-    if (g) {		// Controlla che il puntatore sia valido
-        free(g->X);		// Libera array coordinate X
-        free(g->Y);		// Libera array coordinate Y
-        free(g);		// Libera struttura principale
+    if (g) {
+        free(g->X);
+        free(g->Y);
+        free(g);
     }
 }

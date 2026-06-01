@@ -1,22 +1,22 @@
 # Official Results Contract
 
-Questo documento definisce i risultati ufficiali da usare in report/presentazioni.
+This document defines the official results to be used in reports and presentations.
 
-## Formati ufficiali
+## Official formats
 
-- Tabelle numeriche: `csv`
-- Log run e note operative: `txt` / `log.txt`
-- Figure finali: immagini in `figures/`
+- Numerical tables: `csv`
+- Run logs and operational notes: `txt` / `log.txt`
+- Final figures: images in `figures/`
 
-## Output standard (single run e batch standard)
+## Standard output (single run and standard batch)
 
 Root: `angio2d_c/output/`
 
-Per ogni run:
+For each run:
 
 `<grid>x<grid>-<threads>threads/run-XXX/`
 
-Contenuto minimo richiesto per run:
+Minimum required contents for each run:
 
 - `csv/timing.csv`
 - `csv/diagnostics_c.csv`
@@ -25,20 +25,20 @@ Contenuto minimo richiesto per run:
 - `csv/solution_c_P.csv`
 - `csv/solution_c_Inh.csv`
 - `csv/solution_c_F.csv`
-- `figures/` (4 immagini finali)
+- `figures/` (4 final images)
 - `log.txt`
 
-Contenuto minimo richiesto a livello root batch:
+Minimum required contents at the batch root level:
 
 - `timing.csv`
 - `speedup_summary.md`
 - `validation_summary.md`
 
-## Output campaign H100 (CUDA only)
+## H100 campaign output (CUDA only)
 
 Root: `results/h100_cuda_campaign/`
 
-Contenuto minimo richiesto:
+Minimum required contents:
 
 - `cuda_speedup_summary.csv`
 - `cuda_speedup_summary.md`
@@ -46,12 +46,12 @@ Contenuto minimo richiesto:
 - `slurm_<JOBID>.out`
 - `slurm_<JOBID>.err`
 
-## Artefatti ufficiali già presenti
+## Official artifacts already present
 
-- report campaign H100: `docs/h100_cuda_campaign_results.md`
-- tabella tempi ufficiale unica: `docs/official_gpu_times.csv`
+- H100 campaign report: `docs/h100_cuda_campaign_results.md`
+- Single official GPU timings table: `docs/official_gpu_times.csv`
 
-## Regola per merge su main
+## Merge rule for `main`
 
-Non si versionano artefatti transienti o raw non necessari.
-Si versionano solo risultati riproducibili e leggibili utili a confronto/documentazione.
+Do not commit transient or unnecessary raw artifacts.
+Only version reproducible, human-readable results useful for comparison/documentation.

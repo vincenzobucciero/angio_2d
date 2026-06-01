@@ -4,77 +4,77 @@
 #include "params.h"
 
 /*
- * Struttura ADI (Alternating Direction Implicit).
+ * ADI (Alternating Direction Implicit) structure.
  *
- * Contiene tutti i dati necessari per eseguire un passo diffusivo
- * con schema ADI 2D:
+ * Contains all data needed to perform a diffusive step
+ * with a 2D ADI scheme:
  *
- * - ax, bx, cx = coefficienti tridiagonali lungo x
- * - ay, by, cy = coefficienti tridiagonali lungo y
+ * - ax, bx, cx = tridiagonal coefficients along x
+ * - ay, by, cy = tridiagonal coefficients along y
  *
- * - RHS  = termine noto primo semi-passo (implicito in x)
- * - RHS2 = termine noto secondo semi-passo (implicito in y)
+ * - RHS  = first half-step right-hand side (implicit in x)
+ * - RHS2 = second half-step right-hand side (implicit in y)
  *
- * - U_star = soluzione intermedia dopo il primo sweep
+ * - U_star = intermediate solution after the first sweep
  *
- * - Mx, My = dimensioni della griglia
+ * - Mx, My = grid dimensions
  */
 typedef struct {
-    double *ax, *bx, *cx;		/* Matrice tridiagonale lungo x */
-    double *ay, *by, *cy;		/* Matrice tridiagonale lungo y */
+    double *ax, *bx, *cx;		/* Tridiagonal matrix along x */
+    double *ay, *by, *cy;		/* Tridiagonal matrix along y */
     
-    double *RHS;			/* Termine noto primo semi-passo */
-    double *RHS2;			/* Termine noto secondo semi-passo */
+    double *RHS;			/* First half-step RHS */
+    double *RHS2;			/* Second half-step RHS */
     
-    double *U_star;			/* Soluzione intermedia */
-    double *thomas_c_star;   /* Workspace Thomas per thread */
-    double *thomas_d_star;   /* Workspace Thomas per thread */
-    double *rhs_col_buffer;  /* Buffer colonne RHS per thread */
-    double *sol_col_buffer;  /* Buffer colonne soluzione per thread */
-    int max_threads;         /* Numero massimo thread supportati */
-    int thomas_nmax;         /* Massima dimensione sistema Thomas */
+    double *U_star;			/* Intermediate solution */
+    double *thomas_c_star;   /* Per-thread Thomas workspace */
+    double *thomas_d_star;   /* Per-thread Thomas workspace */
+    double *rhs_col_buffer;  /* Per-thread RHS column buffer */
+    double *sol_col_buffer;  /* Per-thread solution column buffer */
+    int max_threads;         /* Maximum supported thread count */
+    int thomas_nmax;         /* Maximum Thomas system size */
     /* OPTIMIZATION: Cache-line padding to prevent false sharing between threads */
     int padded_nmax;         /* Padded size for cache-line alignment (nmax + 8 doubles) */
     int padded_my;           /* Padded My for cache-line alignment (My + 8 doubles) */
     
-    int Mx, My;			/* Dimensioni della griglia */
+    int Mx, My;			/* Grid dimensions */
 } ADI;
 
 /*
- * Alloca e inizializza la struttura ADI.
+ * Allocate and initialize the ADI structure.
  *
  * Input:
- *   p = parametri del modello
+ *   p = model parameters
  *
  * Output:
- *   puntatore a ADI pronto all'uso
- *   oppure NULL in caso di errore
+ *   pointer to a ready-to-use ADI object
+ *   or NULL on error
  */
 ADI* adi_create(const Params *p);
 
 /*
- * Libera tutta la memoria associata alla struttura ADI.
+ * Free all memory associated with the ADI structure.
  */
 void adi_free(ADI *adi);
 
 /*
- * Risolve un sistema lineare tridiagonale usando il metodo di Thomas.
+ * Solve a tridiagonal linear system using the Thomas method.
  *
  * Sistema:
  *   Ax = d
  *
- * dove A è definita da:
- *   a = sottodiagonale
- *   b = diagonale principale
- *   c = sovradiagonale
+ * where A is defined by:
+ *   a = subdiagonal
+ *   b = main diagonal
+ *   c = superdiagonal
  *
  * Input:
- *   a, b, c = coefficienti tridiagonali
- *   d       = termine noto
- *   n       = dimensione sistema
+ *   a, b, c = tridiagonal coefficients
+ *   d       = right-hand side
+ *   n       = system size
  *
  * Output:
- *   x = soluzione del sistema
+ *   x = system solution
  */
 void thomas_solve(const double *a, const double *b, const double *c,
                   const double *d, double *x, int n);
@@ -84,21 +84,21 @@ void thomas_solve_ws(const double *a, const double *b, const double *c,
                      double *c_star, double *d_star);
 
 /*
- * Esegue un passo diffusivo usando lo schema ADI.
+ * Perform a diffusive step using the ADI scheme.
  *
- * Risolve:
+ * Solves:
  *   ∂u/∂t = d Δu
  *
- * con schema Peaceman-Rachford:
- *   1) implicito in x, esplicito in y
- *   2) esplicito in x, implicito in y
+ * with the Peaceman-Rachford scheme:
+ *   1) implicit in x, explicit in y
+ *   2) explicit in x, implicit in y
  *
  * Input:
- *   u       = campo da aggiornare (in-place)
- *   p       = parametri della simulazione
- *   adi     = struttura ADI con buffer allocati
- *   d_coeff = coefficiente di diffusione
- *   tau     = passo temporale
+ *   u       = field to update (in place)
+ *   p       = simulation parameters
+ *   adi     = ADI structure with allocated buffers
+ *   d_coeff = diffusion coefficient
+ *   tau     = time step
  */
 void adi_step(double *u, const Params *p, ADI *adi, double d_coeff, double tau);
 

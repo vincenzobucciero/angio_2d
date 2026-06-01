@@ -4,88 +4,82 @@
 #include <math.h>
 
 /*
- * Calcola il campo TAF e le quantità ausiliarie associate.
+ * Compute the analytical TAF field and related auxiliary arrays.
  *
- * Per ogni nodo della griglia costruisce:
- * - T      = profilo del TAF
- * - Tx, Ty = gradienti analitici del TAF
- * - phi_x, phi_y = gradienti del potenziale ausiliario
+ * For each grid node we build:
+ * - T      = TAF profile (Gaussian)
+ * - Tx,Ty  = analytical gradients of T
+ * - phi_x,phi_y = gradients of the auxiliary potential phi
  *
- * Input:
- *   p = parametri del modello
- *   g = griglia cartesiana
+ * Inputs:
+ *   p = model parameters
+ *   g = Cartesian grid
  *
- * Output:
- *   puntatore a struttura TAF inizializzata
- *   oppure NULL in caso di errore
+ * Returns:
+ *   pointer to an initialized TAF struct, or NULL on error
  */
 TAF* taf_compute(const Params *p, const Grid *g) {
-    if (!p || !g) {		// Verifica validità dei puntatori in ingresso
-        fprintf(stderr, "ERROR: taf_compute received NULL pointer\n");		// Stampa errore
-        return NULL;		// Esce con errore
+    if (!p || !g) {		// validate input pointers
+        fprintf(stderr, "ERROR: taf_compute received NULL pointer\n");
+        return NULL;
     }
     
-    TAF *t = (TAF*) malloc(sizeof(TAF));		// Alloca struttura principale TAF
-    if (!t) {		// Controlla allocazione
-        fprintf(stderr, "ERROR: Failed to allocate TAF\n");		// Errore
-        return NULL;		// Esce
+    TAF *t = (TAF*) malloc(sizeof(TAF));		// allocate main TAF struct
+    if (!t) {		// allocation check
+        fprintf(stderr, "ERROR: Failed to allocate TAF\n");
+        return NULL;
     }
     
-    int M = p->Mx * p->My;		// Numero totale di nodi della griglia
+    int M = p->Mx * p->My;		// total number of grid nodes
     
-    t->T = (double*) malloc(M * sizeof(double));		// Campo TAF
-    t->Tx = (double*) malloc(M * sizeof(double));		// Derivata del TAF in x
-    t->Ty = (double*) malloc(M * sizeof(double));		// Derivata del TAF in y
-    t->phi_x = (double*) malloc(M * sizeof(double));		// Componente x del potenziale ausiliario
-    t->phi_y = (double*) malloc(M * sizeof(double));		// Componente y del potenziale ausiliario
+    t->T = (double*) malloc(M * sizeof(double));
+    t->Tx = (double*) malloc(M * sizeof(double));
+    t->Ty = (double*) malloc(M * sizeof(double));
+    t->phi_x = (double*) malloc(M * sizeof(double));
+    t->phi_y = (double*) malloc(M * sizeof(double));
     
-    if (!t->T || !t->Tx || !t->Ty || !t->phi_x || !t->phi_y) {		// Verifica allocazioni
-        fprintf(stderr, "ERROR: Failed to allocate TAF arrays\n");		// Stampa errore
-        free(t->T);		// Libera T se allocato
-        free(t->Tx);		// Libera Tx se allocato
-        free(t->Ty);		// Libera Ty se allocato
-        free(t->phi_x);		// Libera phi_x se allocato
-        free(t->phi_y);		// Libera phi_y se allocato
-        free(t);		// Libera struttura principale
-        return NULL;		// Esce con errore
+    if (!t->T || !t->Tx || !t->Ty || !t->phi_x || !t->phi_y) {		// allocation check
+        fprintf(stderr, "ERROR: Failed to allocate TAF arrays\n");
+        free(t->T);
+        free(t->Tx);
+        free(t->Ty);
+        free(t->phi_x);
+        free(t->phi_y);
+        free(t);
+        return NULL;
     }
     
-    t->Mx = p->Mx;		// Salva numero nodi in x
-    t->My = p->My;		// Salva numero nodi in y
+    t->Mx = p->Mx;        // store grid dims
+    t->My = p->My;
     
-    double inv_eps = 1.0 / p->epsilon;		// Precalcola 1/epsilon
+    double inv_eps = 1.0 / p->epsilon;		// precompute 1/epsilon
     
-    for (int ij = 0; ij < M; ij++) {		// Scorre tutti i nodi della griglia
-        double dx = g->X[ij] - p->Lx;		// Distanza orizzontale dal centro del tumore
-        double dy = g->Y[ij] - p->Ly / 2.0;		// Distanza verticale dal centro del tumore
+    for (int ij = 0; ij < M; ij++) {		    // iterate over all grid nodes
+        double dx = g->X[ij] - p->Lx;		    // horizontal distance from tumor center
+        double dy = g->Y[ij] - p->Ly / 2.0;		// vertical distance from tumor center
         
-        double r2 = dx*dx + dy*dy;		// Distanza quadratica dal centro
-        t->T[ij] = exp(-inv_eps * r2);		// Profilo gaussiano del TAF
+        double r2 = dx*dx + dy*dy;          // squared radius
+        t->T[ij] = exp(-inv_eps * r2);      // Gaussian TAF profile
         
-        t->Tx[ij] = -2.0 * inv_eps * dx * t->T[ij];		// Derivata analitica del TAF in x
-        t->Ty[ij] = -2.0 * inv_eps * dy * t->T[ij];		// Derivata analitica del TAF in y
+        t->Tx[ij] = -2.0 * inv_eps * dx * t->T[ij];    // analytical dT/dx
+        t->Ty[ij] = -2.0 * inv_eps * dy * t->T[ij];    // analytical dT/dy
         
-        double denom = 1.0 + p->alpha4 * t->T[ij];		// Denominatore del potenziale ausiliario
-        t->phi_x[ij] = t->Tx[ij] / denom;		// Componente x del gradiente del potenziale
-        t->phi_y[ij] = t->Ty[ij] / denom;		// Componente y del gradiente del potenziale
+        double denom = 1.0 + p->alpha4 * t->T[ij];    // denominator for phi
+        t->phi_x[ij] = t->Tx[ij] / denom;    // phi_x = Tx/(1+alpha4*T)
+        t->phi_y[ij] = t->Ty[ij] / denom;    // phi_y = Ty/(1+alpha4*T)
     }
     
-    return t;		// Restituisce struttura TAF inizializzata
+    return t;		// return pointer to initialized TAF struct
 }
 
-/*
- * Libera la memoria associata alla struttura TAF.
- *
- * Input:
- *   t = struttura TAF da deallocare
- */
+/* Free memory associated with a TAF struct. */
 void taf_free(TAF *t) {
-    if (t) {		// Controlla validità del puntatore
-        free(t->T);		// Libera campo TAF
-        free(t->Tx);		// Libera derivata in x
-        free(t->Ty);		// Libera derivata in y
-        free(t->phi_x);		// Libera potenziale ausiliario in x
-        free(t->phi_y);		// Libera potenziale ausiliario in y
-        free(t);		// Libera struttura principale
+    if (t) {
+        free(t->T);
+        free(t->Tx);
+        free(t->Ty);
+        free(t->phi_x);
+        free(t->phi_y);
+        free(t);
     }
 }

@@ -5,60 +5,60 @@
 #include "params.h"
 
 /*
- * Salva la diagnostica temporale su file CSV.
+ * Save temporal diagnostics to a CSV file.
  *
- * Il file contiene le colonne:
+ * The file contains the columns:
  *   t, mC, mF, Energy
  *
  * Input:
- *   diag     = struttura diagnostica
- *   p        = parametri della simulazione
- *   filename = nome del file di output
+ *   diag     = diagnostics structure
+ *   p        = simulation parameters
+ *   filename = output filename
  */
 void diagnostics_save_csv(const Diagnostics *diag, const Params *p,
                           const char *filename);
 
 /*
- * Stampa a terminale un riepilogo della simulazione.
+ * Print a simulation summary to the terminal.
  *
- * Include:
- * - informazioni sulla griglia e sul tempo
- * - valori iniziali e finali di mC, mF, energia
- * - variazioni percentuali
+ * Includes:
+ * - grid and time information
+ * - initial and final values of mC, mF, energy
+ * - percentage changes
  *
  * Input:
- *   diag = struttura diagnostica
- *   p    = parametri della simulazione
+ *   diag = diagnostics structure
+ *   p    = simulation parameters
  */
 void diagnostics_print_summary(const Diagnostics *diag, const Params *p);
 
 /*
- * Salva i campi finali della simulazione in file CSV separati.
+ * Save the final simulation fields to separate CSV files.
  *
- * I file prodotti sono:
+ * The generated files are:
  *   prefix_C.csv
  *   prefix_P.csv
  *   prefix_Inh.csv
  *   prefix_F.csv
  *
  * Input:
- *   C,P,Inh,F = campi finali
- *   p         = parametri della simulazione
- *   prefix    = prefisso dei file di output
+ *   C,P,Inh,F = final fields
+ *   p         = simulation parameters
+ *   prefix    = output file prefix
  */
 void save_solution_to_csv(const double *C, const double *P,
                           const double *Inh, const double *F,
                           const Params *p, const char *prefix);
 
 /*
- * Salva i parametri principali della simulazione in formato CSV.
+ * Save the main simulation parameters as CSV.
  *
- * Include:
+ * Includes:
  *   Mx, My, Lx, Ly, hx, hy, Tf, tau, Nsteps, epsilon
  *
  * Input:
- *   p        = parametri della simulazione
- *   filename = nome del file di output
+ *   p        = simulation parameters
+ *   filename = output filename
  */
 void save_run_metadata(const Params *p, const char *filename);
 
