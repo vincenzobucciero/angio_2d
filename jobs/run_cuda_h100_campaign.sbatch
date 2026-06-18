@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-CONFIG_PATH="configs/h100_cuda_campaign.yaml"
+CONFIG_PATH="configs/h100_two_tests.yaml"
 CUDA_MODULE="${CUDA_MODULE:-nvidia/cuda-12.8.0}"
 
 while [[ $# -gt 0 ]]; do

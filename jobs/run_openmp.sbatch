@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-CONFIG_PATH="configs/run_profile.yaml"
+CONFIG_PATH="configs/benchmark_openmp.yaml"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

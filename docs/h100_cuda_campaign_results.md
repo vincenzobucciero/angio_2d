@@ -1,68 +1,34 @@
-# H100 CUDA Campaign Results
+# H100 CUDA Timing Notes
 
-This page collects the official results of the CUDA campaign on the `h100gpu` partition.
+This page collects the official H100 CUDA timings that are summarized in `docs/official_timings.csv`.
 
-## Setup
+## Tracked inputs
 
-- Backend: `cuda` (CUDA-only, no serial validation)
-- Grids: `64, 128, 256, 512, 1024`
-- Runs per grid: `5`
-- Config: `configs/h100_cuda_campaign.yaml`
 - Job script: `jobs/run_cuda_h100_campaign.sbatch`
-- Strict mode: `ANGIO2D_CUDA_STRICT=1` (default)
-- Detailed profiling: OFF (`ANGIO2D_CUDA_PROFILE=0`, unless explicitly overridden)
+- Large-grid config currently tracked in the repository: `configs/h100_two_tests.yaml`
+- Official timing table: `docs/official_timings.csv`
 
-## Source artifacts
+## Historical runtime sources
 
-- Output root: `results/h100_cuda_campaign/`
-- Environment report: `results/h100_cuda_campaign/cuda_env_report.json`
-- Scheduler log: `results/h100_cuda_campaign/slurm_<JOBID>.out`
-- Aggregated summary: `results/h100_cuda_campaign/cuda_speedup_summary.csv`
-- Human-readable summary: `results/h100_cuda_campaign/cuda_speedup_summary.md`
+The numerical values came from local runtime artifacts that are intentionally not versioned in git.
+The two sources used to curate the current official table are:
 
-## Tabella finale (da compilare a job concluso)
+- the historical H100 campaign summarized in this document
+- the later large-grid rerun recorded locally under `results/h100_two_tests/`
 
-| Grid | Runs OK | Runs Failed | Mean Time (s) | Median Time (s) |
-|---|---:|---:|---:|---:|
-| 64x64 | 1 | 0 | 1.119667 | 1.119667 |
-| 128x128 | 1 | 0 | 3.819542 | 3.819542 |
-| 256x256 | 1 | 0 | 28.432417 | 28.432417 |
-| 512x512 | 1 | 0 | 228.352442 | 228.352442 |
-| 1024x1024 | 1 | 0 | 6040.868769 | 6040.868769 |
+## Official H100 timings
 
-## Note
+| Grid | Official H100 time (s) | Previous official H100 time (s) | Notes |
+|---|---:|---:|---|
+| 64x64 | 1.119667 |  | historical campaign value |
+| 128x128 | 3.819542 |  | historical campaign value |
+| 256x256 | 28.432417 |  | historical campaign value |
+| 512x512 | 228.352442 |  | historical campaign value |
+| 1024x1024 | 1807.569306 | 6040.868769 | both values are official and correspond to two optimization phases |
+| 2048x2048 | 44038.712071 |  | large-grid H100 run from the tracked `h100_two_tests` setup |
 
-- Official values must be copied from `cuda_speedup_summary.csv` at campaign end.
-- In case of preemption or interruptions, re-run the job with the same config to preserve comparability.
-- If a grid fails in strict mode, the job stops intentionally (no silent CPU fallback).
+## Notes
 
-## Official comparisons (summary)
-
-### CPU vs OpenMP (baseline utente)
-| Grid | CPU serial t=1 median (s) | OpenMP best median (s) | Best speedup |
-|---|---:|---:|---:|
-| 64x64 | 0.645349 | 0.219299 | 2.9428x |
-| 128x128 | 16.142345 | 4.478649 | 3.6043x |
-| 256x256 | 319.976824 | 84.016191 | 3.8085x |
-| 512x512 | n.d. | n.d. | n.d. |
-| 1024x1024 | n.d. | n.d. | n.d. |
-
-### CPU vs GPU CUDA (ultimo job, strict mode)
-| Grid | CPU serial (s) | GPU CUDA (s) | GPU/CPU |
-|---|---:|---:|---:|
-| 64x64 | 0.645349 | 1.119667 | 1.74x |
-| 128x128 | 16.142345 | 3.819542 | 0.24x |
-| 256x256 | 319.976824 | 28.432417 | 0.09x |
-| 512x512 | n.d. | 228.352442 | n.d. |
-| 1024x1024 | n.d. | 6040.868769 | n.d. |
-
-Note:
-- The serial run was not completed for `512` and `1024`.
-- CUDA validate runs use `effective_backend=cuda` and `fallback_cpu_detected=no`.
-- Single official CSV: `docs/official_gpu_times.csv`.
-
-## Stato Diagnostico 1024 (storico)
-
--- In an earlier phase the `1024` run failed and triggered strict mode.
--- The cause was in the CUDA ADI kernel (Thomas buffers with fixed sizing).
--- Current status: fix applied; `1024` run completed on GPU (`6040.868769 s`).
+- The `1024x1024` value `6040.868769 s` is kept as an official historical reference.
+- The `1024x1024` value `1807.569306 s` is the later optimized H100 result and is also official.
+- `docs/official_timings.csv` is the primary repository-tracked table; this page only explains the H100-specific context.

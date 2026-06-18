@@ -9,7 +9,7 @@
 set -euo pipefail
 
 ROOT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-CONFIG_PATH="configs/run_profile.yaml"
+CONFIG_PATH="configs/benchmark_gpu.yaml"
 CUDA_MODULE="${CUDA_MODULE:-nvidia/cuda-12.8.0}"
 
 while [[ $# -gt 0 ]]; do
