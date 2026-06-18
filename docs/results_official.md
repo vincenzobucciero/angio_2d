@@ -5,6 +5,8 @@ This document defines which result files are officially versioned in the reposit
 ## Official versioned artifacts
 
 - `docs/official_timings.csv`
+- `docs/official_serial_times.csv`
+- `docs/official_openmp_times.csv`
 - `docs/h100_cuda_campaign_results.md`
 
 These files are the curated, repository-tracked timing references for reports and presentations.

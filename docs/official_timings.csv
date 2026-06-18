@@ -1,7 +1,7 @@
-grid,openmp_time_median_s,cuda_time_median_s,cuda_h100_time_median_s,cuda_h100_previous_time_median_s,notes
-64x64,0.938539,0.914367,1.119667,,"openmp and cuda from local runtime artifacts; h100 value from tracked historical report"
-128x128,9.282914,,3.819542,,"openmp from local runtime artifacts; h100 value from tracked historical report"
-256x256,,,28.432417,,"h100 value from tracked historical report; no current local openmp/cuda artifact"
-512x512,,,228.352442,,"h100 value from tracked historical report; no current local openmp/cuda artifact"
-1024x1024,,,1807.569306,6040.868769,"both h100 values are official and correspond to two optimization phases"
-2048x2048,,,44038.712071,,"h100 value from local runtime artifact"
+grid,serial_time_median_s,openmp_time_median_s,cuda_time_median_s,cuda_h100_time_median_s,cuda_h100_previous_time_median_s,notes
+64x64,2.005495,0.938539,0.914367,1.119667,,"serial/openmp/cuda from local runtime artifacts; h100 value from tracked historical report"
+128x128,28.644441,9.282914,,3.819542,,"serial/openmp from local runtime artifacts; h100 value from tracked historical report"
+256x256,,,,28.432417,,"h100 value from tracked historical report; no current local serial/openmp/cuda artifact"
+512x512,,,,228.352442,,"h100 value from tracked historical report; no current local serial/openmp/cuda artifact"
+1024x1024,,,,1807.569306,6040.868769,"both h100 values are official and correspond to two optimization phases"
+2048x2048,,,,44038.712071,,"h100 value from local runtime artifact"
