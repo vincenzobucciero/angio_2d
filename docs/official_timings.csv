@@ -1,7 +1,7 @@
 grid,serial_time_median_s,openmp_time_median_s,cuda_time_median_s,cuda_h100_time_median_s,cuda_h100_previous_time_median_s,notes
 64x64,2.005495,0.938539,0.914367,1.119667,,"serial/openmp/cuda from local runtime artifacts; h100 value from tracked historical report"
 128x128,28.644441,9.282914,,3.819542,,"serial/openmp from local runtime artifacts; h100 value from tracked historical report"
-256x256,,,,28.432417,,"h100 value from tracked historical report; no current local serial/openmp/cuda artifact"
-512x512,,,,228.352442,,"h100 value from tracked historical report; no current local serial/openmp/cuda artifact"
-1024x1024,,,,1807.569306,6040.868769,"both h100 values are official and correspond to two optimization phases"
+256x256,556.786684,146.195385,28.801267,28.432417,,"serial/openmp/cuda from low-gn single-run benchmarks; h100 value from tracked historical report"
+512x512,10568.630324,3391.002739,227.890420,228.352442,,"serial/openmp/cuda from low-gn single-run benchmarks; h100 value from tracked historical report"
+1024x1024,,,,1807.569306,,"optimized h100 result"
 2048x2048,,,,44038.712071,,"h100 value from local runtime artifact"

@@ -1,3 +1,5 @@
 grid,threads,time_mean_s,time_median_s,source,notes
 64x64,1,2.005495,2.005495,results/submit_grid64_all/serial/serial_speedup_summary.csv,local runtime artifact curated into docs
 128x128,4,28.644441,28.644441,angio2d_c/output/serial_speedup_summary.csv,local runtime artifact curated into docs
+256x256,1,556.786684,556.786684,results/single_run_serial_256_512/256x256-1threads/run-001/log.txt,low-gn single-run serial benchmark
+512x512,1,10568.630324,10568.630324,results/single_run_serial_256_512/512x512-1threads/run-001/log.txt,low-gn single-run serial benchmark

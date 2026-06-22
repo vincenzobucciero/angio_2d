@@ -1,3 +1,5 @@
 grid,threads,time_mean_s,time_median_s,source,notes
 64x64,4,0.938539,0.938539,results/submit_grid64_all/openmp/openmp_speedup_summary.csv,local runtime artifact curated into docs
 128x128,4,9.282914,9.282914,angio2d_c/output/openmp_speedup_summary.csv,local runtime artifact curated into docs
+256x256,4,146.195385,146.195385,results/single_run_openmp_256_512/timing.csv,low-gn single-run openmp benchmark
+512x512,4,3391.002739,3391.002739,results/single_run_openmp_256_512/timing.csv,low-gn single-run openmp benchmark

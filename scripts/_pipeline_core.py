@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,6 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[1]
 ANGIO2D_C = ROOT / "angio2d_c"
-BENCHMARK_CONFIG = ROOT / "configs" / "benchmark.yaml"
 BIN_PATH = ANGIO2D_C / "build" / "angio2d"
 OUTPUT_ROOT = ANGIO2D_C / "output"
 OUTPUT_CSV_DIR = OUTPUT_ROOT / "csv"
@@ -203,7 +203,7 @@ def _copy_tree(src: Path, dst: Path) -> None:
     shutil.copytree(src, dst)
 
 
-def _run_solver(grid: int, backend: str, threads: Optional[int], timeout_s: int) -> RunResult:
+def _run_solver(grid: int, backend: str, threads: Optional[int], timeout_s: int, config_path: Path) -> RunResult:
     if grid not in GRID_TO_INDEX:
         return RunResult(False, 0.0, "bad_grid", "", f"Unsupported grid size {grid}", 2)
     env = os.environ.copy()
@@ -217,11 +217,25 @@ def _run_solver(grid: int, backend: str, threads: Optional[int], timeout_s: int)
     cmd = [
         str(_binary_for_backend(backend)),
         "--config",
-        str(BENCHMARK_CONFIG),
+        str(config_path),
         "--grid-index",
         str(GRID_TO_INDEX[grid]),
     ]
     return _run(cmd, ANGIO2D_C, env=env, timeout_s=timeout_s)
+
+
+def _single_run_config_path() -> Path:
+    """Materialize a minimal grid-only config for the C solver outside tracked configs."""
+    supported_grids = sorted(GRID_TO_INDEX)
+    lines = ["grids:"]
+    for grid in supported_grids:
+        lines.append(f"  - {{ Mx: {grid}, My: {grid} }}")
+
+    fd, tmp_path = tempfile.mkstemp(prefix="angio2d_single_run_", suffix=".yaml")
+    os.close(fd)
+    path = Path(tmp_path)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
 
 
 def _set_cuda_runtime_env(backend: str, cuda_profile_detailed: bool) -> None:
@@ -384,9 +398,10 @@ def _run_validation_for_current_output(
     threads: Optional[int],
     timeout_s: int,
     run_dir: Path,
+    config_path: Path,
 ) -> str:
     _compile_backend("serial")
-    serial_res = _run_solver(grid, "serial", None, timeout_s)
+    serial_res = _run_solver(grid, "serial", None, timeout_s, config_path)
     if not serial_res.success:
         _compile_backend(backend)
         return "validation: serial baseline failed"
@@ -395,7 +410,7 @@ def _run_validation_for_current_output(
     _copy_tree(OUTPUT_CSV_DIR, serial_snapshot)
 
     _compile_backend(backend)
-    target_res = _run_solver(grid, backend, threads, timeout_s)
+    target_res = _run_solver(grid, backend, threads, timeout_s, config_path)
     if not target_res.success:
         return f"validation: target rerun failed ({target_res.reason})"
 
@@ -430,54 +445,63 @@ def _single_run(
 ) -> int:
     run_dir = _prepare_run_dir(output_dir, grid, threads, run_id=None)
     _set_cuda_runtime_env(backend, cuda_profile_detailed)
-    _compile_backend(backend)
-    result = _run_solver(grid, backend, threads if backend in {"openmp", "cuda"} else None, timeout_s)
+    config_path = _single_run_config_path()
+    try:
+        _compile_backend(backend)
+        result = _run_solver(grid, backend, threads if backend in {"openmp", "cuda"} else None, timeout_s, config_path)
 
-    lines = [
-        f"grid={grid}",
-        f"threads={threads}",
-        f"backend={backend}",
-        f"success={result.success}",
-        f"reason={result.reason}",
-        f"elapsed_s={result.elapsed_s:.6f}",
-        "",
-        "stdout:",
-        result.stdout,
-        "",
-        "stderr:",
-        result.stderr,
-    ]
-    if not result.success:
-        _write_log(run_dir / "log.txt", "\n".join(lines))
-        print(f"Run failed: {result.reason}")
-        return 1
+        lines = [
+            f"grid={grid}",
+            f"threads={threads}",
+            f"backend={backend}",
+            f"success={result.success}",
+            f"reason={result.reason}",
+            f"elapsed_s={result.elapsed_s:.6f}",
+            "",
+            "stdout:",
+            result.stdout,
+            "",
+            "stderr:",
+            result.stderr,
+        ]
+        if not result.success:
+            _write_log(run_dir / "log.txt", "\n".join(lines))
+            print(f"Run failed: {result.reason}")
+            return 1
 
-    if backend == "cuda":
-        gpu_info = _run(["nvidia-smi"], ROOT)
-        if gpu_info.success:
-            lines.append("")
-            lines.append("gpu_info:")
-            lines.append(gpu_info.stdout.strip())
-    lines.append("")
-    lines.append(_persist_outputs(run_dir, generate_plots))
-    if validate:
-        lines.append(
-            _run_validation_for_current_output(
-                grid,
-                backend,
-                threads if backend == "openmp" else None,
-                timeout_s,
-                run_dir,
+        if backend == "cuda":
+            gpu_info = _run(["nvidia-smi"], ROOT)
+            if gpu_info.success:
+                lines.append("")
+                lines.append("gpu_info:")
+                lines.append(gpu_info.stdout.strip())
+        lines.append("")
+        lines.append(_persist_outputs(run_dir, generate_plots))
+        if validate:
+            lines.append(
+                _run_validation_for_current_output(
+                    grid,
+                    backend,
+                    threads if backend == "openmp" else None,
+                    timeout_s,
+                    run_dir,
+                    config_path,
+                )
             )
-        )
 
-    _write_log(run_dir / "log.txt", "\n".join(lines))
-    print(f"Single pipeline completed in: {run_dir}")
-    return 0
+        _write_log(run_dir / "log.txt", "\n".join(lines))
+        print(f"Single pipeline completed in: {run_dir}")
+        return 0
+    finally:
+        config_path.unlink(missing_ok=True)
 
 
 def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
     backend = str(config.get("backend", "openmp"))
+    config_path = config.get("__config_path")
+    if not config_path:
+        raise ValueError("Missing resolved config path in benchmark profile")
+    config_path = Path(str(config_path))
     grid_sizes = [int(x) for x in config.get("grid_sizes", [64, 128, 256])]
     default_threads = [1] if backend == "cuda" else [1, 2, 4]
     threads = [int(x) for x in config.get("threads", default_threads)]
@@ -502,7 +526,13 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
         for thread in threads:
             for run_id in range(1, runs + 1):
                 run_dir = _prepare_run_dir(output_dir, grid, thread, run_id=run_id)
-                run_res = _run_solver(grid, backend, thread if backend in {"openmp", "cuda"} else None, timeout_s)
+                run_res = _run_solver(
+                    grid,
+                    backend,
+                    thread if backend in {"openmp", "cuda"} else None,
+                    timeout_s,
+                    config_path,
+                )
 
                 lines = [
                     f"grid={grid}",
@@ -546,6 +576,7 @@ def run_benchmark_from_profile(config: dict, output_dir: Path) -> int:
                             thread if backend in {"openmp", "cuda"} else None,
                             timeout_s,
                             run_dir,
+                            config_path,
                         )
                         lines.append(validation_text)
                         validation_rows.append(

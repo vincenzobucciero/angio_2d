@@ -34,6 +34,7 @@ def main() -> int:
         raise FileNotFoundError(f"Config not found: {cfg_path}")
 
     config = _load_yaml(cfg_path)
+    config["__config_path"] = str(cfg_path)
     if args.backend:
         config["backend"] = args.backend
     if args.grid is not None:

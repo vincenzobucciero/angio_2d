@@ -4,6 +4,7 @@ This document defines which result files are officially versioned in the reposit
 
 ## Official versioned artifacts
 
+- `docs/timing_summary.md`
 - `docs/official_timings.csv`
 - `docs/official_serial_times.csv`
 - `docs/official_openmp_times.csv`

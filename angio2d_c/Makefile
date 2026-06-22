@@ -33,7 +33,7 @@ check-python: check-env
 	@$(PYTHON) -c "import numpy, matplotlib, PIL" >/dev/null 2>&1 || { echo "ERROR: missing Python dependencies for '$(PYTHON)'. Run 'pip install -r requirements.txt' (or 'pip install -r angio2d_c/requirements.txt' from repo root)."; exit 1; }
 
 clean:
-	rm -rf $(BUILDDIR) $(BINDIR)
+	rm -rf $(BUILDDIR)
 
 run: check-env $(BUILDDIR)/angio2d
 	./$(BUILDDIR)/angio2d

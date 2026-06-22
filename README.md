@@ -48,6 +48,7 @@ sbatch jobs/run_cuda_h100_campaign.sbatch
 ```
 
 ## Official versioned documentation
+- Timing summary (Markdown): `docs/timing_summary.md`
 - Combined timings table: `docs/official_timings.csv`
 - Official serial timings: `docs/official_serial_times.csv`
 - Official OpenMP timings: `docs/official_openmp_times.csv`

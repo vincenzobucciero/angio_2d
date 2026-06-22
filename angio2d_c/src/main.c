@@ -41,7 +41,7 @@ static void ensure_output_dirs(void) {
  *
  * Example:
  *   ./angio2d                                    # Default 64x64
- *   ./angio2d --config ../configs/benchmark.yaml --grid-index 1  # 128x128
+ *   ./angio2d --config ../configs/baseline_serial.yaml --grid-index 1  # 128x128
  *
  * Overall flow:
  * 1) parse CLI arguments

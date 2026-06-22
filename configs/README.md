@@ -40,3 +40,4 @@ sbatch jobs/run_cuda_h100_campaign.sbatch
 - Update `threads` only for `benchmark_openmp.yaml`.
 - Increase `timeout_per_run` for larger grids or slower hardware.
 - Keep `backend` aligned with the intended runner.
+- Avoid tracking one-off benchmark profiles here; keep only stable repository configs.
