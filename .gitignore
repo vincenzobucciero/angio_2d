@@ -30,6 +30,12 @@ results/h100_cuda_campaign/*
 !results/h100_cuda_campaign/cuda_speedup_summary.csv
 !results/h100_cuda_campaign/cuda_speedup_summary.md
 !results/h100_cuda_campaign/cuda_env_report.json
+!results/test_06-2026/
+results/test_06-2026/*
+!results/test_06-2026/README.md
+!results/test_06-2026/serial_timing.csv
+!results/test_06-2026/openmp4_timing.csv
+!results/test_06-2026/cuda_timing.csv
 results/h100_cuda_campaign/slurm_*.out
 results/h100_cuda_campaign/slurm_*.err
 
