@@ -1,5 +1,0 @@
-grid,threads,run,success,elapsed_s,reason
-64x64,4,1,True,0.935738,ok
-128x128,4,1,True,10.004226,ok
-256x256,4,1,True,139.934912,ok
-512x512,4,1,True,3219.701683,ok
