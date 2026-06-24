@@ -1,0 +1,5 @@
+grid,threads,run,success,elapsed_s,reason
+64x64,1,1,True,0.848697,ok
+128x128,1,1,True,3.779289,ok
+256x256,1,1,True,28.154520,ok
+512x512,1,1,True,226.773082,ok

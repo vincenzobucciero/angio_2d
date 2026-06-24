@@ -5,6 +5,10 @@ This document defines which result files are officially versioned in the reposit
 ## Official versioned artifacts
 
 - `docs/timing_summary.md`
+- `docs/test_06-2026/README.md`
+- `docs/test_06-2026/serial_timing.csv`
+- `docs/test_06-2026/openmp4_timing.csv`
+- `docs/test_06-2026/cuda_timing.csv`
 - `docs/official_timings.csv`
 - `docs/official_serial_times.csv`
 - `docs/official_openmp_times.csv`
